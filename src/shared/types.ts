@@ -56,6 +56,7 @@ export type AppScreen =
 
 // IPC API type for renderer
 export interface ElectronAPI {
+  checkGitHubAuth: () => Promise<boolean>
   fetchPR: (prUrl: string) => Promise<PRData>
   postComments: (prUrl: string, comments: ReviewComment[]) => Promise<void>
   analyzePR: (diff: string, persona: string) => Promise<ReviewComment[]>

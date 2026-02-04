@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   // GitHub operations
+  checkGitHubAuth: () => ipcRenderer.invoke('github:checkAuth'),
   fetchPR: (prUrl: string) => ipcRenderer.invoke('github:fetchPR', prUrl),
   postComments: (prUrl: string, comments: unknown[]) =>
     ipcRenderer.invoke('github:postComments', prUrl, comments),

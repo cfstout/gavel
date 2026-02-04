@@ -6,7 +6,8 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "noEmit": true
+    "outDir": "./dist-typecheck",
+    "declaration": true
   },
   "include": ["vite.config.ts", "electron"]
 }
