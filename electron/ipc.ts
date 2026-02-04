@@ -1,6 +1,12 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { fetchPR, postComments, checkAuth, getPRHeadSha } from './github'
-import type { ReviewComment } from '../src/shared/types'
+import { analyzePR, refinementChat, checkClaudeAuth } from './claude'
+import { loadPersonas } from './personas'
+import type { ReviewComment, Persona } from '../src/shared/types'
+
+// Cache for personas and conversation context
+let personasCache: Persona[] | null = null
+const refinementContexts = new Map<string, string>()
 
 /**
  * Register all IPC handlers for the main process
@@ -20,20 +26,62 @@ export function registerIpcHandlers(): void {
     return postComments(prRef, comments, commitSha)
   })
 
-  // Claude handlers (placeholder - will be implemented in Phase 3)
-  ipcMain.handle('claude:analyzePR', async (_event, _diff: string, _persona: string) => {
-    // TODO: Implement in Phase 3
-    return []
+  // Claude handlers
+  ipcMain.handle('claude:checkAuth', async () => {
+    return checkClaudeAuth()
   })
 
-  ipcMain.handle('claude:refinementChat', async (_event, _commentId: string, _message: string) => {
-    // TODO: Implement in Phase 3
-    return ''
+  ipcMain.handle('claude:analyzePR', async (event, diff: string, personaId: string) => {
+    // Get the persona content
+    const personas = await getPersonas()
+    const persona = personas.find((p) => p.id === personaId)
+
+    if (!persona) {
+      throw new Error(`Persona not found: ${personaId}`)
+    }
+
+    // Get the main window for progress updates
+    const mainWindow = BrowserWindow.fromWebContents(event.sender)
+
+    return analyzePR(diff, persona.content, mainWindow)
   })
 
-  // Persona handlers (placeholder - will be implemented in Phase 3)
+  ipcMain.handle(
+    'claude:refinementChat',
+    async (_event, commentId: string, comment: ReviewComment, message: string) => {
+      // Get existing context for this comment's refinement conversation
+      const existingContext = refinementContexts.get(commentId) || ''
+
+      // Call Claude for refinement
+      const refined = await refinementChat(comment, message, existingContext)
+
+      // Update context with new exchange
+      const newContext = `${existingContext}\n\nUser: ${message}\nAssistant: ${refined}`
+      refinementContexts.set(commentId, newContext)
+
+      return refined
+    }
+  )
+
+  // Persona handlers
   ipcMain.handle('personas:getAll', async () => {
-    // TODO: Implement in Phase 3
-    return []
+    return getPersonas()
   })
+}
+
+/**
+ * Get personas (with caching)
+ */
+async function getPersonas(): Promise<Persona[]> {
+  if (!personasCache) {
+    personasCache = await loadPersonas()
+  }
+  return personasCache
+}
+
+/**
+ * Clear the personas cache (useful when user adds new personas)
+ */
+export function clearPersonasCache(): void {
+  personasCache = null
 }

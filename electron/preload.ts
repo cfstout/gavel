@@ -10,10 +10,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:postComments', prUrl, comments),
 
   // Claude operations
-  analyzePR: (diff: string, persona: string) =>
-    ipcRenderer.invoke('claude:analyzePR', diff, persona),
-  refinementChat: (commentId: string, message: string) =>
-    ipcRenderer.invoke('claude:refinementChat', commentId, message),
+  checkClaudeAuth: () => ipcRenderer.invoke('claude:checkAuth'),
+  analyzePR: (diff: string, personaId: string) =>
+    ipcRenderer.invoke('claude:analyzePR', diff, personaId),
+  refinementChat: (commentId: string, comment: unknown, message: string) =>
+    ipcRenderer.invoke('claude:refinementChat', commentId, comment, message),
 
   // Persona operations
   getPersonas: () => ipcRenderer.invoke('personas:getAll'),
