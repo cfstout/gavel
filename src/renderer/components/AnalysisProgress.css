@@ -1,0 +1,121 @@
+.analysis-screen {
+  display: flex;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  overflow: auto;
+}
+
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 700px;
+  width: 100%;
+}
+
+.analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.analysis-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.analysis-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.analysis-header p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.analysis-header strong {
+  color: var(--color-text-primary);
+}
+
+.analysis-info {
+  display: flex;
+  gap: 24px;
+  padding: 16px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.analysis-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.stat-add {
+  color: var(--color-accent-green);
+}
+
+.stat-del {
+  color: var(--color-accent-red);
+}
+
+.analysis-output-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 200px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.analysis-output-header {
+  padding: 8px 12px;
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analysis-output {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 300px;
+}

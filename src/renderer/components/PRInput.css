@@ -1,0 +1,77 @@
+.pr-input-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+}
+
+.pr-input-card {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+}
+
+.pr-input-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.pr-input-header p {
+  color: var(--color-text-secondary);
+}
+
+.pr-input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pr-input-field label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.pr-input-field input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+}
+
+.pr-input-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.pr-input-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: rgba(248, 81, 73, 0.1);
+  border: 1px solid var(--color-accent-red);
+  border-radius: 6px;
+  color: var(--color-accent-red);
+  font-size: 14px;
+}
+
+.pr-input-error .error-icon {
+  flex-shrink: 0;
+}
+
+.pr-input-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pr-input-actions button {
+  min-width: 120px;
+}
