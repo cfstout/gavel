@@ -10,8 +10,13 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@types/prismjs": "^1.26.5",
+    "prismjs": "^1.30.0",
     "react": "^18.3.1",
+    "react-diff-view": "^3.3.2",
     "react-dom": "^18.3.1",
+    "refractor": "^5.0.0",
+    "unidiff": "^1.0.4",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

@@ -3,6 +3,7 @@ import { useReviewStore } from './store/reviewStore'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
 import { AnalysisProgress } from './components/AnalysisProgress'
+import { ReviewScreen } from './components/ReviewScreen'
 import './styles/App.css'
 
 export default function App() {
@@ -29,6 +30,14 @@ export default function App() {
     setScreen('persona-select')
   }, [setScreen])
 
+  const handleReviewBack = useCallback(() => {
+    setScreen('persona-select')
+  }, [setScreen])
+
+  const handleReviewSubmit = useCallback(() => {
+    setScreen('submitting')
+  }, [setScreen])
+
   const renderScreen = () => {
     switch (screen) {
       case 'pr-input':
@@ -48,13 +57,11 @@ export default function App() {
         )
 
       case 'review':
-        // TODO: Phase 5 - Diff View
         return (
-          <div className="placeholder-screen">
-            <h2>Review Screen</h2>
-            <p>Coming in Phase 5</p>
-            <button onClick={() => setScreen('pr-input')}>Start Over</button>
-          </div>
+          <ReviewScreen
+            onSubmit={handleReviewSubmit}
+            onBack={handleReviewBack}
+          />
         )
 
       case 'submitting':
