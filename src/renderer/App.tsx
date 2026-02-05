@@ -1,9 +1,12 @@
 import { useCallback, useEffect, Component, ReactNode } from 'react'
 import { useReviewStore } from './store/reviewStore'
+import { useInboxStore } from './store/inboxStore'
+import { InboxScreen } from './components/InboxScreen'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
 import { AnalysisProgress } from './components/AnalysisProgress'
 import { ReviewScreen } from './components/ReviewScreen'
+import type { InboxPR } from '@shared/types'
 import './styles/App.css'
 
 // Top-level error boundary to catch React crashes
@@ -55,7 +58,11 @@ class AppErrorBoundary extends Component<
 }
 
 export default function App() {
-  const { screen, setScreen, error, setError, reset, isRestored, restoreState } = useReviewStore()
+  const { screen, setScreen, setPRRef, setPRData, error, setError, reset, isRestored, restoreState } = useReviewStore()
+  const { movePR } = useInboxStore()
+
+  // Track the current PR being reviewed from inbox
+  const currentInboxPRRef = useReviewStore((state) => state.prRef)
 
   // Restore saved state on mount
   useEffect(() => {
@@ -64,12 +71,34 @@ export default function App() {
     }
   }, [isRestored, restoreState])
 
+  // Handle starting a review from the inbox
+  const handleReviewFromInbox = useCallback(
+    async (pr: InboxPR) => {
+      try {
+        // Fetch full PR data
+        const prData = await window.electronAPI.fetchPR(pr.url)
+        setPRRef(pr.url)
+        setPRData(prData)
+        setScreen('persona-select')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch PR'
+        setError(message)
+      }
+    },
+    [setPRRef, setPRData, setScreen, setError]
+  )
+
+  const handleManualEntry = useCallback(() => {
+    setScreen('pr-input')
+  }, [setScreen])
+
   const handlePRInputNext = useCallback(() => {
     setScreen('persona-select')
   }, [setScreen])
 
   const handlePersonaBack = useCallback(() => {
-    setScreen('pr-input')
+    // Go back to inbox if we came from there, otherwise pr-input
+    setScreen('inbox')
   }, [setScreen])
 
   const handlePersonaNext = useCallback(() => {
@@ -89,13 +118,32 @@ export default function App() {
     setScreen('persona-select')
   }, [setScreen])
 
-  const handleReviewSubmitSuccess = useCallback(() => {
-    // After successful submission, go back to PR input for next review
-    setScreen('pr-input')
-  }, [setScreen])
+  const handleReviewSubmitSuccess = useCallback(async () => {
+    // Move the PR to reviewed column if it came from inbox
+    if (currentInboxPRRef) {
+      // Extract PR ID from the ref
+      const match = currentInboxPRRef.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+      if (match) {
+        const prId = `${match[1]}/${match[2]}#${match[3]}`
+        await movePR(prId, 'reviewed')
+      }
+    }
+
+    // After successful submission, go back to inbox
+    reset()
+    setScreen('inbox')
+  }, [currentInboxPRRef, movePR, reset, setScreen])
 
   const renderScreen = () => {
     switch (screen) {
+      case 'inbox':
+        return (
+          <InboxScreen
+            onReviewPR={handleReviewFromInbox}
+            onManualEntry={handleManualEntry}
+          />
+        )
+
       case 'pr-input':
         return <PRInput onNext={handlePRInputNext} />
 

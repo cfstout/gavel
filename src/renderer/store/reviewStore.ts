@@ -55,7 +55,7 @@ interface ReviewState {
 }
 
 const initialState = {
-  screen: 'pr-input' as AppScreen,
+  screen: 'inbox' as AppScreen,
   prRef: '',
   prData: null,
   selectedPersona: null,
@@ -124,7 +124,8 @@ export const useReviewStore = create<ReviewState>()(
       } catch (err) {
         console.error('Failed to restore state:', err)
       }
-      set({ isRestored: true })
+      // Default to inbox screen
+      set({ isRestored: true, screen: 'inbox' })
       return false
     },
 
