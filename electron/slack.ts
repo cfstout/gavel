@@ -1,44 +1,8 @@
 import { spawn } from 'node:child_process'
 import type { GitHubSearchPR } from '../src/shared/types'
-import { getPRStatus } from './github'
 
 // Regex to extract GitHub PR URLs from text
 const PR_URL_REGEX = /https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/g
-
-interface SlackMessage {
-  text: string
-  ts: string
-  user?: string
-}
-
-interface SlackSearchResponse {
-  messages: {
-    matches: SlackMessage[]
-  }
-}
-
-/**
- * Execute a claude command to access Slack MCP
- * This runs the Claude CLI which has MCP access configured
- */
-async function execClaudeMcp(toolName: string, params: Record<string, unknown>): Promise<string> {
-  return new Promise((resolve, reject) => {
-    // Build the MCP call as a JSON request
-    const request = JSON.stringify({
-      tool: toolName,
-      params,
-    })
-
-    // We'll use the gh CLI approach - spawn a process
-    // For now, we'll use a simple approach: call the Slack API via the gh-like pattern
-    // In practice, this would integrate with the MCP server
-
-    // Since we can't directly call MCP from the Electron app,
-    // we'll use a workaround: parse slack message exports or use gh to fetch
-
-    reject(new Error('Slack MCP integration requires Claude CLI context'))
-  })
-}
 
 /**
  * Extract GitHub PR URLs from a text string
@@ -62,151 +26,217 @@ export function extractPRUrls(text: string): Array<{ owner: string; repo: string
 }
 
 /**
- * Deduplicate PR matches
- */
-function deduplicatePRs(prs: Array<{ owner: string; repo: string; number: number }>): Array<{ owner: string; repo: string; number: number }> {
-  const seen = new Set<string>()
-  return prs.filter((pr) => {
-    const key = `${pr.owner}/${pr.repo}#${pr.number}`
-    if (seen.has(key)) {
-      return false
-    }
-    seen.add(key)
-    return true
-  })
-}
-
-/**
- * Fetch PR details from GitHub for extracted URLs
- */
-async function fetchPRDetails(
-  prs: Array<{ owner: string; repo: string; number: number }>
-): Promise<GitHubSearchPR[]> {
-  const results: GitHubSearchPR[] = []
-
-  for (const pr of prs) {
-    try {
-      const prRef = `${pr.owner}/${pr.repo}#${pr.number}`
-      const status = await getPRStatus(prRef)
-
-      // Fetch full PR details using gh
-      const proc = spawn('gh', [
-        'pr',
-        'view',
-        String(pr.number),
-        '--repo',
-        `${pr.owner}/${pr.repo}`,
-        '--json',
-        'title,author,url,headRefOid,state,mergedAt',
-      ])
-
-      const output = await new Promise<string>((resolve, reject) => {
-        let stdout = ''
-        let stderr = ''
-
-        proc.stdout.on('data', (data) => {
-          stdout += data.toString()
-        })
-        proc.stderr.on('data', (data) => {
-          stderr += data.toString()
-        })
-
-        proc.on('close', (code) => {
-          if (code !== 0) {
-            reject(new Error(stderr || `gh failed with code ${code}`))
-          } else {
-            resolve(stdout)
-          }
-        })
-
-        proc.on('error', reject)
-      })
-
-      const data = JSON.parse(output) as {
-        title: string
-        author: { login: string }
-        url: string
-        headRefOid: string
-        state: string
-        mergedAt: string | null
-      }
-
-      results.push({
-        owner: pr.owner,
-        repo: pr.repo,
-        number: pr.number,
-        title: data.title,
-        author: data.author.login,
-        url: data.url,
-        headSha: data.headRefOid,
-        state: data.mergedAt ? 'merged' : status.state,
-      })
-    } catch (err) {
-      // Skip PRs we can't access
-      console.warn(`Failed to fetch PR ${pr.owner}/${pr.repo}#${pr.number}:`, err)
-    }
-  }
-
-  return results
-}
-
-/**
- * Fetch PRs from a Slack channel
+ * Fetch PRs from a Slack channel using Claude CLI with Slack MCP
  *
- * This function attempts to use the Slack MCP to search for PR URLs in a channel.
- * If MCP is not available, it returns an error that guides the user to configure it.
+ * This spawns the Claude CLI and asks it to use the Slack MCP tools to
+ * search for GitHub PR URLs in the specified channel.
  */
 export async function fetchSlackPRs(
   channelName: string,
   since?: string
 ): Promise<{ prs: GitHubSearchPR[]; error?: string }> {
-  try {
-    // Build search query - search for github.com/*/pull URLs in the channel
-    const searchQuery = `in:${channelName} github.com/*/pull`
+  const prompt = buildSlackFetchPrompt(channelName, since)
 
-    // Try to use Slack MCP via Claude CLI
-    // For now, we'll simulate the expected response format
+  return new Promise((resolve) => {
+    const proc = spawn('claude', ['-p', prompt, '--output-format', 'text'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
 
-    // The actual implementation would call:
-    // mcp__slack__conversations_search_messages({
-    //   search_query: searchQuery,
-    //   filter_date_after: since,
-    //   limit: 50
-    // })
+    let stdout = ''
+    let stderr = ''
 
-    // Since we can't directly call MCP from Electron's main process,
-    // we need to use a different approach:
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
 
-    // Option 1: Use a local file that contains exported Slack messages
-    // Option 2: Use a Slack bot token directly (requires user setup)
-    // Option 3: Return an error prompting the user to configure Slack integration
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
 
-    return {
-      prs: [],
-      error:
-        'Slack integration requires the Slack MCP plugin to be enabled in Claude Code. ' +
-        'To use this feature, please configure the Slack MCP server in your Claude Code settings.',
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return {
-      prs: [],
-      error: `Failed to fetch from Slack: ${message}`,
-    }
-  }
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        // Check for common errors
+        if (stderr.includes('not found') || stderr.includes('ENOENT')) {
+          resolve({
+            prs: [],
+            error: 'Claude CLI not found. Please install Claude Code.',
+          })
+        } else if (stderr.includes('slack') && stderr.includes('not configured')) {
+          resolve({
+            prs: [],
+            error: 'Slack MCP plugin not configured. Enable it in Claude Code settings.',
+          })
+        } else {
+          resolve({
+            prs: [],
+            error: stderr || `Claude command failed with code ${code}`,
+          })
+        }
+        return
+      }
+
+      try {
+        const result = parseSlackResponse(stdout)
+        resolve(result)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        resolve({
+          prs: [],
+          error: `Failed to parse Slack response: ${message}`,
+        })
+      }
+    })
+
+    proc.on('error', (err) => {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        resolve({
+          prs: [],
+          error: 'Claude CLI not found. Please install Claude Code.',
+        })
+      } else {
+        resolve({
+          prs: [],
+          error: err.message,
+        })
+      }
+    })
+  })
 }
 
 /**
- * Parse Slack messages and extract PR URLs
- * This is used when we have raw message data (e.g., from an export)
+ * Build the prompt for Claude to fetch Slack messages
  */
-export function parseSlackMessages(messages: Array<{ text: string }>): Array<{ owner: string; repo: string; number: number }> {
-  const allPRs: Array<{ owner: string; repo: string; number: number }> = []
+function buildSlackFetchPrompt(channelName: string, since?: string): string {
+  const sinceClause = since
+    ? `Only include messages from after ${since}.`
+    : 'Include messages from the last 7 days.'
 
-  for (const message of messages) {
-    const prs = extractPRUrls(message.text)
-    allPRs.push(...prs)
+  return `You have access to Slack via MCP tools. I need you to search for GitHub Pull Request URLs in a Slack channel.
+
+## Task
+1. Use the Slack MCP tool to search for messages in the channel "${channelName}" that contain "github.com" and "pull"
+2. Extract all GitHub PR URLs from the messages (format: https://github.com/owner/repo/pull/number)
+3. For each unique PR URL found, use the GitHub CLI (gh) to fetch the PR details
+4. Return the results as JSON
+
+${sinceClause}
+
+## Output Format
+Return ONLY a JSON object with this structure:
+\`\`\`json
+{
+  "prs": [
+    {
+      "owner": "string",
+      "repo": "string",
+      "number": 123,
+      "title": "PR title",
+      "author": "username",
+      "url": "https://github.com/owner/repo/pull/123",
+      "headSha": "abc123...",
+      "state": "open"
+    }
+  ],
+  "error": null
+}
+\`\`\`
+
+If you cannot access Slack (MCP not configured), return:
+\`\`\`json
+{
+  "prs": [],
+  "error": "Slack MCP plugin not configured. Enable it in Claude Code settings."
+}
+\`\`\`
+
+If the channel doesn't exist or you can't access it:
+\`\`\`json
+{
+  "prs": [],
+  "error": "Cannot access channel: ${channelName}"
+}
+\`\`\`
+
+If no PR URLs are found, return:
+\`\`\`json
+{
+  "prs": [],
+  "error": null
+}
+\`\`\`
+
+Return ONLY the JSON, no other text.`
+}
+
+/**
+ * Parse Claude's response containing Slack PR data
+ */
+function parseSlackResponse(response: string): { prs: GitHubSearchPR[]; error?: string } {
+  // Try to extract JSON from the response
+  let jsonStr = response
+
+  // Remove markdown code blocks if present
+  const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1]
   }
 
-  return deduplicatePRs(allPRs)
+  // Try to find JSON object in the response
+  const objectMatch = jsonStr.match(/\{[\s\S]*\}/)
+  if (objectMatch) {
+    jsonStr = objectMatch[0]
+  }
+
+  const parsed = JSON.parse(jsonStr.trim())
+
+  // Validate the response structure
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('Expected JSON object')
+  }
+
+  if (parsed.error) {
+    return { prs: [], error: parsed.error }
+  }
+
+  if (!Array.isArray(parsed.prs)) {
+    return { prs: [], error: 'Invalid response: missing prs array' }
+  }
+
+  // Validate and map each PR
+  const prs: GitHubSearchPR[] = parsed.prs
+    .filter((pr: unknown) => {
+      if (typeof pr !== 'object' || pr === null) return false
+      const p = pr as Record<string, unknown>
+      return (
+        typeof p.owner === 'string' &&
+        typeof p.repo === 'string' &&
+        typeof p.number === 'number' &&
+        typeof p.title === 'string' &&
+        typeof p.author === 'string' &&
+        typeof p.url === 'string'
+      )
+    })
+    .map((pr: Record<string, unknown>) => ({
+      owner: pr.owner as string,
+      repo: pr.repo as string,
+      number: pr.number as number,
+      title: pr.title as string,
+      author: pr.author as string,
+      url: pr.url as string,
+      headSha: (pr.headSha as string) || '',
+      state: mapState(pr.state as string),
+    }))
+
+  return { prs }
+}
+
+/**
+ * Map state string to our type
+ */
+function mapState(state: string | undefined): 'open' | 'closed' | 'merged' {
+  if (!state) return 'open'
+  const lower = state.toLowerCase()
+  if (lower === 'merged') return 'merged'
+  if (lower === 'closed') return 'closed'
+  return 'open'
 }
