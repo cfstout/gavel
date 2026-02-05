@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { registerIpcHandlers } from './ipc'
+import { startPolling, stopPolling } from './polling'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,6 +40,7 @@ function createWindow() {
 }
 
 app.on('window-all-closed', () => {
+  stopPolling()
   if (process.platform !== 'darwin') {
     app.quit()
     mainWindow = null
@@ -54,4 +56,5 @@ app.on('activate', () => {
 app.whenReady().then(() => {
   registerIpcHandlers()
   createWindow()
+  startPolling()
 })

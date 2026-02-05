@@ -1,9 +1,12 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { fetchPR, postComments, checkAuth, getPRHeadSha } from './github'
+import { fetchPR, postComments, checkAuth, getPRHeadSha, searchPRs, getPRStatus } from './github'
 import { analyzePR, refinementChat, checkClaudeAuth } from './claude'
 import { loadPersonas } from './personas'
 import { saveState, loadState, clearState } from './persistence'
-import type { ReviewComment, Persona, PersistedState } from '../src/shared/types'
+import { loadInboxState, saveInboxState } from './inbox'
+import { fetchSlackPRs } from './slack'
+import { startPolling, stopPolling, triggerPoll } from './polling'
+import type { ReviewComment, Persona, PersistedState, InboxState } from '../src/shared/types'
 
 // Cache for personas and conversation context
 let personasCache: Persona[] | null = null
@@ -80,6 +83,45 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('state:clear', async () => {
     return clearState()
+  })
+
+  // GitHub search handlers
+  ipcMain.handle('github:searchPRs', async (_event, query: string) => {
+    return searchPRs(query)
+  })
+
+  ipcMain.handle('github:getPRStatus', async (_event, prRef: string) => {
+    return getPRStatus(prRef)
+  })
+
+  // Inbox handlers
+  ipcMain.handle('inbox:load', async () => {
+    return loadInboxState()
+  })
+
+  ipcMain.handle('inbox:save', async (_event, state: InboxState) => {
+    return saveInboxState(state)
+  })
+
+  ipcMain.handle('inbox:fetchSlackPRs', async (_event, channelName: string, since?: string) => {
+    const result = await fetchSlackPRs(channelName, since)
+    if (result.error) {
+      throw new Error(result.error)
+    }
+    return result.prs
+  })
+
+  // Polling handlers
+  ipcMain.handle('polling:start', () => {
+    startPolling()
+  })
+
+  ipcMain.handle('polling:stop', () => {
+    stopPolling()
+  })
+
+  ipcMain.handle('polling:trigger', async () => {
+    return triggerPoll()
   })
 }
 
