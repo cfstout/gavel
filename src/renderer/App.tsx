@@ -59,7 +59,7 @@ class AppErrorBoundary extends Component<
 
 export default function App() {
   const { screen, setScreen, setPRRef, setPRData, error, setError, reset, isRestored, restoreState } = useReviewStore()
-  const { movePR } = useInboxStore()
+  const { addPR, movePR } = useInboxStore()
 
   // Track the current PR being reviewed from inbox
   const currentInboxPRRef = useReviewStore((state) => state.prRef)
@@ -119,12 +119,34 @@ export default function App() {
   }, [setScreen])
 
   const handleReviewSubmitSuccess = useCallback(async () => {
-    // Move the PR to reviewed column if it came from inbox
     if (currentInboxPRRef) {
-      // Extract PR ID from the ref
       const match = currentInboxPRRef.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
       if (match) {
-        const prId = `${match[1]}/${match[2]}#${match[3]}`
+        const [, owner, repo, number] = match
+        const prId = `${owner}/${repo}#${number}`
+        const prData = useReviewStore.getState().prData
+
+        // Ensure the PR exists in the inbox (handles manual entry)
+        if (prData) {
+          const now = new Date().toISOString()
+          await addPR({
+            id: prId,
+            owner,
+            repo,
+            number: parseInt(number, 10),
+            title: prData.metadata.title,
+            author: prData.metadata.author,
+            url: currentInboxPRRef,
+            headSha: '', // Will be updated on next poll
+            column: 'inbox',
+            source: 'github-search',
+            sourceId: 'manual',
+            addedAt: now,
+            lastCheckedAt: now,
+          })
+        }
+
+        // Move to reviewed
         await movePR(prId, 'reviewed')
       }
     }
@@ -132,7 +154,7 @@ export default function App() {
     // After successful submission, go back to inbox
     reset()
     setScreen('inbox')
-  }, [currentInboxPRRef, movePR, reset, setScreen])
+  }, [currentInboxPRRef, addPR, movePR, reset, setScreen])
 
   const renderScreen = () => {
     switch (screen) {

@@ -18,6 +18,7 @@ interface InboxStoreState {
   addSource: (source: PRSource) => Promise<void>
   removeSource: (sourceId: string) => Promise<void>
   updateSource: (sourceId: string, updates: Partial<PRSource>) => Promise<void>
+  addPR: (pr: InboxPR) => Promise<void>
   movePR: (prId: string, column: KanbanColumn) => Promise<void>
   ignorePR: (prId: string) => Promise<void>
   setError: (error: string | null) => void
@@ -151,6 +152,31 @@ export const useInboxStore = create<InboxStoreState>()(
         set({ sources: newSources })
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to update source'
+        set({ error: message })
+      }
+    },
+
+    addPR: async (pr) => {
+      const { prs, sources, lastPollAt, pollIntervalMs } = get()
+
+      // Deduplicate by ID — if it already exists, don't add again
+      if (prs.some((p) => p.id === pr.id)) {
+        return
+      }
+
+      const newPRs = [...prs, pr]
+      const newState: InboxState = {
+        prs: newPRs,
+        sources,
+        lastPollAt,
+        pollIntervalMs,
+      }
+
+      try {
+        await window.electronAPI.saveInboxState(newState)
+        set({ prs: newPRs })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to add PR'
         set({ error: message })
       }
     },
