@@ -138,21 +138,21 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
         />
 
         <KanbanColumn
-          title="Needs Attention"
-          column="needs-attention"
-          prs={needsAttentionPRs}
-          emptyMessage="All caught up!"
-          onReview={handleReview}
-          onIgnore={handleIgnore}
-        />
-
-        <KanbanColumn
           title="Reviewed"
           column="reviewed"
           prs={reviewedPRs}
           emptyMessage="No reviewed PRs"
           onReview={handleReview}
           showActions={false}
+        />
+
+        <KanbanColumn
+          title="Needs Attention"
+          column="needs-attention"
+          prs={needsAttentionPRs}
+          emptyMessage="All caught up!"
+          onReview={handleReview}
+          onIgnore={handleIgnore}
         />
 
         <KanbanColumn
