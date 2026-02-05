@@ -2,8 +2,7 @@
 
 A local-first AI code review assistant that helps you conduct GitHub PR reviews with Claude.
 
-<!-- TODO: Add screenshot -->
-<!-- ![Gavel Screenshot](docs/screenshot.png) -->
+![Gavel Screenshot](docs/screenshot.png)
 
 ## What is Gavel?
 
