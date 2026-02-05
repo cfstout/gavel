@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useReviewStore } from '../store/reviewStore'
 import { DiffViewer } from './DiffViewer'
 import { FileTree } from './FileTree'
@@ -14,7 +14,13 @@ interface ReviewScreenProps {
 }
 
 export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
-  const { prData, comments, selectedPersona } = useReviewStore()
+  const { prData, comments, selectedPersona, reset } = useReviewStore()
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+
+  const handleExit = useCallback(() => {
+    reset()
+    onSubmitSuccess() // Reuses the same navigation (goes to pr-input)
+  }, [reset, onSubmitSuccess])
 
   // Compute approved comments with useMemo to avoid infinite loops
   const approvedComments = useMemo(
@@ -65,6 +71,12 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
         </div>
         <div className="review-toolbar-right">
           <button
+            className="exit-button"
+            onClick={() => setShowExitConfirm(true)}
+          >
+            Exit Review
+          </button>
+          <button
             className="toggle-comments"
             onClick={() => setShowCommentPanel(!showCommentPanel)}
           >
@@ -79,6 +91,19 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
           </button>
         </div>
       </div>
+
+      {showExitConfirm && (
+        <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
+          <div className="exit-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Exit Review?</h3>
+            <p>This will discard all comments and start fresh.</p>
+            <div className="exit-confirm-buttons">
+              <button onClick={() => setShowExitConfirm(false)}>Cancel</button>
+              <button className="danger" onClick={handleExit}>Exit</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="review-content">
         <FileTree
