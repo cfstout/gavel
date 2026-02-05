@@ -2,7 +2,8 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { fetchPR, postComments, checkAuth, getPRHeadSha } from './github'
 import { analyzePR, refinementChat, checkClaudeAuth } from './claude'
 import { loadPersonas } from './personas'
-import type { ReviewComment, Persona } from '../src/shared/types'
+import { saveState, loadState, clearState } from './persistence'
+import type { ReviewComment, Persona, PersistedState } from '../src/shared/types'
 
 // Cache for personas and conversation context
 let personasCache: Persona[] | null = null
@@ -66,6 +67,19 @@ export function registerIpcHandlers(): void {
   // Persona handlers
   ipcMain.handle('personas:getAll', async () => {
     return getPersonas()
+  })
+
+  // Persistence handlers
+  ipcMain.handle('state:save', async (_event, state: Omit<PersistedState, 'savedAt'>) => {
+    return saveState(state)
+  })
+
+  ipcMain.handle('state:load', async () => {
+    return loadState()
+  })
+
+  ipcMain.handle('state:clear', async () => {
+    return clearState()
   })
 }
 

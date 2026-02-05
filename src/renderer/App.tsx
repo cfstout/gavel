@@ -1,4 +1,4 @@
-import { useCallback, Component, ReactNode } from 'react'
+import { useCallback, useEffect, Component, ReactNode } from 'react'
 import { useReviewStore } from './store/reviewStore'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
@@ -55,7 +55,14 @@ class AppErrorBoundary extends Component<
 }
 
 export default function App() {
-  const { screen, setScreen, error, setError, reset } = useReviewStore()
+  const { screen, setScreen, error, setError, reset, isRestored, restoreState } = useReviewStore()
+
+  // Restore saved state on mount
+  useEffect(() => {
+    if (!isRestored) {
+      restoreState()
+    }
+  }, [isRestored, restoreState])
 
   const handlePRInputNext = useCallback(() => {
     setScreen('persona-select')
@@ -116,6 +123,24 @@ export default function App() {
       default:
         return null
     }
+  }
+
+  // Show loading state while restoring
+  if (!isRestored) {
+    return (
+      <div className="app">
+        <header className="app-header">
+          <h1>Gavel</h1>
+          <span className="tagline">AI Code Review Assistant</span>
+        </header>
+        <main className="app-content">
+          <div className="loading-screen">
+            <div className="loading-spinner" />
+            <p>Loading...</p>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (

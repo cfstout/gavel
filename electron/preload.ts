@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Persona operations
   getPersonas: () => ipcRenderer.invoke('personas:getAll'),
 
+  // Persistence operations
+  saveState: (state: unknown) => ipcRenderer.invoke('state:save', state),
+  loadState: () => ipcRenderer.invoke('state:load'),
+  clearState: () => ipcRenderer.invoke('state:clear'),
+
   // Event listeners for streaming
   onAnalysisProgress: (callback: (progress: string) => void) => {
     ipcRenderer.on('claude:progress', (_event, progress) => callback(progress))

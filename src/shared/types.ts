@@ -60,6 +60,16 @@ export interface PostCommentsResult {
   failed: Array<{ file: string; line: number; error: string }>
 }
 
+// Persisted state for resuming reviews
+export interface PersistedState {
+  prRef: string
+  prData: PRData | null
+  selectedPersona: Persona | null
+  comments: ReviewComment[]
+  screen: AppScreen
+  savedAt: string
+}
+
 // IPC API type for renderer
 export interface ElectronAPI {
   // GitHub
@@ -72,6 +82,10 @@ export interface ElectronAPI {
   refinementChat: (commentId: string, comment: ReviewComment, message: string) => Promise<string>
   // Personas
   getPersonas: () => Promise<Persona[]>
+  // Persistence
+  saveState: (state: Omit<PersistedState, 'savedAt'>) => Promise<void>
+  loadState: () => Promise<PersistedState | null>
+  clearState: () => Promise<void>
   // Events
   onAnalysisProgress: (callback: (progress: string) => void) => () => void
 }
