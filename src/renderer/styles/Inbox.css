@@ -1,0 +1,474 @@
+/* Inbox Screen Layout */
+.inbox-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 24px;
+  gap: 16px;
+}
+
+.inbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.inbox-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.inbox-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inbox-actions button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.inbox-actions .refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-actions .refresh-btn.loading .refresh-icon {
+  animation: spin 1s linear infinite;
+}
+
+.last-poll {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Error Banner */
+.inbox-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: rgba(248, 81, 73, 0.1);
+  border: 1px solid var(--color-accent-red);
+  border-radius: 6px;
+  color: var(--color-accent-red);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.inbox-error button {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  border-color: var(--color-accent-red);
+  color: var(--color-accent-red);
+}
+
+/* Kanban Board */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Kanban Column */
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-secondary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background-color: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kanban-column-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kanban-column-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-secondary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.kanban-column-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-column-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* PR Card */
+.pr-card {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  cursor: default;
+  transition: border-color 0.15s ease;
+}
+
+.pr-card:hover {
+  border-color: var(--color-text-muted);
+}
+
+.pr-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pr-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pr-card-number {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.pr-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.pr-card-repo {
+  color: var(--color-accent-blue);
+}
+
+.pr-card-author::before {
+  content: '@';
+}
+
+.pr-card-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pr-card-source-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.pr-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pr-card-actions button {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.pr-card-actions .review-btn {
+  background-color: var(--color-accent-green);
+  border-color: var(--color-accent-green);
+  color: white;
+}
+
+.pr-card-actions .review-btn:hover {
+  background-color: #2ea043;
+}
+
+.pr-card-actions .ignore-btn {
+  background-color: transparent;
+}
+
+.pr-card-actions .ignore-btn:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* Source indicator badges */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.source-badge.github {
+  background-color: rgba(88, 166, 255, 0.15);
+  color: var(--color-accent-blue);
+}
+
+.source-badge.slack {
+  background-color: rgba(255, 195, 0, 0.15);
+  color: #ffc300;
+}
+
+/* Empty State */
+.inbox-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: 40px;
+}
+
+.inbox-empty-state h3 {
+  font-size: 18px;
+  color: var(--color-text-primary);
+}
+
+.inbox-empty-state p {
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* Source Config Modal */
+.source-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.source-modal {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.source-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.source-modal-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.source-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.source-modal-close:hover {
+  color: var(--color-text-primary);
+}
+
+.source-modal-content {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.source-type-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.source-type-tab {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 13px;
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.source-type-tab.active {
+  background-color: var(--color-accent-blue);
+  border-color: var(--color-accent-blue);
+  color: white;
+}
+
+.source-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.source-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.source-form-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.source-form-field input {
+  padding: 10px 12px;
+}
+
+.source-form-field .hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.source-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Sources List (in modal) */
+.sources-list {
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.sources-list h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 12px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.source-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.source-item-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.source-item-detail {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.source-item-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.source-item-actions button {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+/* Manual PR Entry Link */
+.manual-entry-link {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.manual-entry-link button {
+  background: transparent;
+  color: var(--color-accent-blue);
+  border: none;
+  font-size: 13px;
+}
+
+.manual-entry-link button:hover {
+  text-decoration: underline;
+}
+
+/* Needs Attention Indicator */
+.needs-attention-indicator {
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-accent-yellow);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Done column styling */
+.kanban-column.done .pr-card {
+  opacity: 0.7;
+}
+
+.kanban-column.done .pr-card-title {
+  text-decoration: line-through;
+}
