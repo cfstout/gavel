@@ -54,12 +54,18 @@ export type AppScreen =
   | 'review'
   | 'submitting'
 
+// Result from posting comments
+export interface PostCommentsResult {
+  posted: number
+  failed: Array<{ file: string; line: number; error: string }>
+}
+
 // IPC API type for renderer
 export interface ElectronAPI {
   // GitHub
   checkGitHubAuth: () => Promise<boolean>
   fetchPR: (prUrl: string) => Promise<PRData>
-  postComments: (prUrl: string, comments: ReviewComment[]) => Promise<void>
+  postComments: (prUrl: string, comments: ReviewComment[]) => Promise<PostCommentsResult>
   // Claude
   checkClaudeAuth: () => Promise<boolean>
   analyzePR: (diff: string, personaId: string) => Promise<ReviewComment[]>

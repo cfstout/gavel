@@ -16,6 +16,10 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
   )
   const [isSubmitting, setIsSubmittingLocal] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitResult, setSubmitResult] = useState<{
+    posted: number
+    failed: Array<{ file: string; line: number; error: string }>
+  } | null>(null)
 
   const handleSubmit = async () => {
     if (!prData || approvedComments.length === 0) return
@@ -23,12 +27,23 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
     setIsSubmittingLocal(true)
     setSubmitting(true)
     setSubmitError(null)
+    setSubmitResult(null)
 
     try {
       const prRef = `${prData.metadata.owner}/${prData.metadata.repo}#${prData.metadata.number}`
-      await window.electronAPI.postComments(prRef, approvedComments)
-      onSuccess()
-      reset() // Clear state for next review
+      const result = await window.electronAPI.postComments(prRef, approvedComments)
+
+      setSubmitResult(result)
+
+      // If all or some succeeded, consider it a success
+      if (result.posted > 0) {
+        if (result.failed.length === 0) {
+          // Full success - close and reset
+          onSuccess()
+          reset()
+        }
+        // Partial success - stay open to show results
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to submit comments'
       setSubmitError(message)
@@ -37,6 +52,11 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
       setIsSubmittingLocal(false)
       setSubmitting(false)
     }
+  }
+
+  const handleDone = () => {
+    reset()
+    onSuccess()
   }
 
   return (
@@ -50,23 +70,52 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
         </div>
 
         <div className="submit-modal-body">
-          <p className="submit-summary">
-            You are about to submit{' '}
-            <strong>{approvedComments.length} comment{approvedComments.length !== 1 ? 's' : ''}</strong>{' '}
-            to{' '}
-            <strong>
-              {prData?.metadata.owner}/{prData?.metadata.repo}#{prData?.metadata.number}
-            </strong>
-          </p>
+          {submitResult ? (
+            // Show results after submission
+            <>
+              {submitResult.posted > 0 && (
+                <div className="submit-success">
+                  Successfully posted {submitResult.posted} comment{submitResult.posted !== 1 ? 's' : ''} to GitHub
+                </div>
+              )}
+              {submitResult.failed.length > 0 && (
+                <div className="submit-partial-failure">
+                  <p>{submitResult.failed.length} comment{submitResult.failed.length !== 1 ? 's' : ''} could not be posted:</p>
+                  <ul className="failure-list">
+                    {submitResult.failed.map((f, i) => (
+                      <li key={i}>
+                        <code>{f.file}:{f.line}</code> - {f.error}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="failure-hint">
+                    This usually happens when the line number is outside the diff context.
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            // Show preview before submission
+            <>
+              <p className="submit-summary">
+                You are about to submit{' '}
+                <strong>{approvedComments.length} comment{approvedComments.length !== 1 ? 's' : ''}</strong>{' '}
+                to{' '}
+                <strong>
+                  {prData?.metadata.owner}/{prData?.metadata.repo}#{prData?.metadata.number}
+                </strong>
+              </p>
 
-          <div className="submit-preview">
-            <div className="submit-preview-header">Comments to Submit</div>
-            <div className="submit-preview-list">
-              {approvedComments.map((comment) => (
-                <CommentPreview key={comment.id} comment={comment} />
-              ))}
-            </div>
-          </div>
+              <div className="submit-preview">
+                <div className="submit-preview-header">Comments to Submit</div>
+                <div className="submit-preview-list">
+                  {approvedComments.map((comment) => (
+                    <CommentPreview key={comment.id} comment={comment} />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {submitError && (
             <div className="submit-error">{submitError}</div>
@@ -74,16 +123,24 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
         </div>
 
         <div className="submit-modal-footer">
-          <button onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </button>
-          <button
-            className="primary"
-            onClick={handleSubmit}
-            disabled={isSubmitting || approvedComments.length === 0}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit to GitHub'}
-          </button>
+          {submitResult ? (
+            <button className="primary" onClick={handleDone}>
+              Done
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </button>
+              <button
+                className="primary"
+                onClick={handleSubmit}
+                disabled={isSubmitting || approvedComments.length === 0}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit to GitHub'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

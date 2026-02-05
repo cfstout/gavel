@@ -42,7 +42,9 @@ async function execGh(args: string[]): Promise<string> {
         } else if (stderr.includes('Could not resolve')) {
           reject(new Error('Repository not found or not accessible'))
         } else {
-          reject(new Error(stderr || `gh command failed with code ${code}`))
+          // Include stdout in error for API responses that return error details
+          const errorDetails = stdout || stderr
+          reject(new Error(errorDetails || `gh command failed with code ${code}`))
         }
       } else {
         resolve(stdout)
@@ -125,59 +127,67 @@ export async function fetchPR(prRef: string): Promise<PRData> {
 
 /**
  * Post review comments to a PR using gh API
+ * Returns info about which comments succeeded/failed
  */
 export async function postComments(
   prRef: string,
   comments: ReviewComment[],
   commitSha: string
-): Promise<void> {
+): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const { owner, repo, number } = parsePRReference(prRef)
 
-  // Create a review with all comments
-  // Using gh api to create a PR review
-  const reviewBody = {
-    commit_id: commitSha,
-    event: 'COMMENT',
-    comments: comments.map((c) => ({
-      path: c.file,
-      line: c.line,
-      body: formatCommentBody(c),
-    })),
-  }
+  const results = { posted: 0, failed: [] as Array<{ file: string; line: number; error: string }> }
 
-  await execGh([
-    'api',
-    '--method',
-    'POST',
-    `/repos/${owner}/${repo}/pulls/${number}/reviews`,
-    '-f',
-    `commit_id=${commitSha}`,
-    '-f',
-    'event=COMMENT',
-    '-f',
-    `body=Review by Gavel`,
-    '--input',
-    '-',
-  ])
-
-  // Actually, let's use a simpler approach - post each comment individually
-  // This is more reliable and allows for better error handling
+  // Post each comment individually using the pull request review comments API
   for (const comment of comments) {
-    await execGh([
-      'api',
-      '--method',
-      'POST',
-      `/repos/${owner}/${repo}/pulls/${number}/comments`,
-      '-f',
-      `body=${formatCommentBody(comment)}`,
-      '-f',
-      `path=${comment.file}`,
-      '-f',
-      `line=${comment.line}`,
-      '-f',
-      `commit_id=${commitSha}`,
-    ])
+    try {
+      await execGh([
+        'api',
+        '--method',
+        'POST',
+        `/repos/${owner}/${repo}/pulls/${number}/comments`,
+        '-f',
+        `body=${formatCommentBody(comment)}`,
+        '-f',
+        `path=${comment.file}`,
+        '-F',
+        `line=${comment.line}`, // -F sends as raw JSON (integer)
+        '-f',
+        `commit_id=${commitSha}`,
+        '-f',
+        'side=RIGHT', // Comment on the new version of the file
+        '-f',
+        'subject_type=line', // Required for line comments
+      ])
+      results.posted++
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+      // Check if it's a line-not-in-diff error
+      if (errorMsg.includes('422') || errorMsg.includes('Validation Failed')) {
+        results.failed.push({
+          file: comment.file,
+          line: comment.line,
+          error: `Line ${comment.line} is not part of the diff - comment skipped`,
+        })
+      } else {
+        results.failed.push({
+          file: comment.file,
+          line: comment.line,
+          error: errorMsg,
+        })
+      }
+    }
   }
+
+  // If all comments failed, throw an error
+  if (results.posted === 0 && results.failed.length > 0) {
+    const failureDetails = results.failed
+      .map((f) => `  ${f.file}:${f.line} - ${f.error}`)
+      .join('\n')
+    throw new Error(`Failed to post any comments:\n${failureDetails}`)
+  }
+
+  return results
 }
 
 /**
