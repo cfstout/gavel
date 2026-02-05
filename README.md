@@ -2,7 +2,8 @@
 
 A local-first AI code review assistant that helps you conduct GitHub PR reviews with Claude.
 
-![Gavel Screenshot](docs/screenshot.png)
+<!-- TODO: Add screenshot -->
+<!-- ![Gavel Screenshot](docs/screenshot.png) -->
 
 ## What is Gavel?
 
@@ -14,7 +15,10 @@ Gavel acts as a "staging area" for AI-generated code reviews. It:
 4. Lets you approve, reject, or refine each comment
 5. Batch-posts your approved comments to GitHub
 
-**Key Feature:** Comments are staged locally—nothing is posted until you explicitly approve and submit.
+**Key Features:**
+- Comments are staged locally—nothing is posted until you explicitly approve and submit
+- Session persistence—quit mid-review and pick up where you left off
+- Inline diff comments—see AI suggestions directly on the code they reference
 
 ## Prerequisites
 
@@ -40,7 +44,7 @@ Before using Gavel, you need:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/gavel.git
+git clone https://github.com/cfstout/gavel.git
 cd gavel
 
 # Install dependencies
@@ -74,7 +78,11 @@ npm run build
 
 ## Custom Personas
 
-Create your own review personas by adding markdown files to `~/.config/gavel/personas/`:
+Create your own review personas by adding markdown files to your Gavel data directory:
+
+- **macOS**: `~/Library/Application Support/gavel/personas/`
+- **Linux**: `~/.config/gavel/personas/`
+- **Windows**: `%APPDATA%/gavel/personas/`
 
 ```markdown
 ---
