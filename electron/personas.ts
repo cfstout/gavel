@@ -4,8 +4,15 @@ import { existsSync } from 'node:fs'
 import { app } from 'electron'
 import type { Persona } from '../src/shared/types'
 
-// Path to built-in personas (relative to app root)
-const BUILTIN_PERSONAS_DIR = join(app.getAppPath(), 'personas')
+// Path to built-in personas
+// In development: relative to app root
+// In production: in the resources directory
+function getBuiltinPersonasDir(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'personas')
+  }
+  return join(app.getAppPath(), 'personas')
+}
 
 // Path to user personas
 const USER_PERSONAS_DIR = join(app.getPath('userData'), 'personas')
@@ -17,7 +24,7 @@ export async function loadPersonas(): Promise<Persona[]> {
   const personas: Persona[] = []
 
   // Load built-in personas
-  const builtInPersonas = await loadPersonasFromDir(BUILTIN_PERSONAS_DIR, true)
+  const builtInPersonas = await loadPersonasFromDir(getBuiltinPersonasDir(), true)
   personas.push(...builtInPersonas)
 
   // Load user personas

@@ -2,7 +2,7 @@
   "name": "gavel",
   "version": "0.1.0",
   "description": "Local AI Code Review Assistant",
-  "main": "dist-electron/main/index.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
@@ -37,8 +37,26 @@
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "personas/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "personas",
+        "to": "personas"
+      }
+    ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "win": {
+      "target": "nsis"
     }
   }
 }
