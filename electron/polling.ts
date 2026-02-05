@@ -56,11 +56,11 @@ export function startPolling(): void {
     const interval = Math.max(state.pollIntervalMs, 60000) // Minimum 1 minute
 
     // Do an initial poll
-    runPoll()
+    runPoll(false)
 
     // Set up recurring poll
     pollTimer = setInterval(() => {
-      runPoll()
+      runPoll(false)
     }, interval)
   })
 }
@@ -77,21 +77,23 @@ export function stopPolling(): void {
 
 /**
  * Trigger an immediate poll (for manual refresh)
+ * Manual triggers bypass the isPolling lock and rate limit backoff
  */
 export async function triggerPoll(): Promise<void> {
-  await runPoll()
+  await runPoll(true)
 }
 
 /**
  * Run a single poll cycle
+ * @param force - If true, bypass isPolling guard and rate limit backoff (for manual refresh)
  */
-async function runPoll(): Promise<void> {
-  if (isPolling) {
+async function runPoll(force: boolean): Promise<void> {
+  if (isPolling && !force) {
     return
   }
 
-  // Check if we're in rate limit backoff
-  if (rateLimitBackoffMs > 0) {
+  // Skip rate limit backoff only for automatic polls
+  if (!force && rateLimitBackoffMs > 0) {
     rateLimitBackoffMs = Math.max(0, rateLimitBackoffMs - 60000)
     if (rateLimitBackoffMs > 0) {
       emitPollError(`Rate limited, retrying in ${Math.ceil(rateLimitBackoffMs / 60000)} minutes`)
@@ -99,11 +101,24 @@ async function runPoll(): Promise<void> {
     }
   }
 
+  // Reset rate limit on manual refresh
+  if (force) {
+    rateLimitBackoffMs = 0
+  }
+
   isPolling = true
 
   try {
     let state = await loadInboxState()
     const enabledSources = state.sources.filter((s) => s.enabled)
+
+    if (enabledSources.length === 0) {
+      // Nothing to poll, still update timestamp
+      state = { ...state, lastPollAt: new Date().toISOString() }
+      await saveInboxState(state)
+      emitInboxUpdate(state)
+      return
+    }
 
     for (const source of enabledSources) {
       try {
@@ -142,7 +157,12 @@ async function pollSource(state: InboxState, source: PRSource): Promise<InboxSta
   if (source.type === 'github-search') {
     prs = await searchPRs(source.query)
   } else if (source.type === 'slack') {
-    const result = await fetchSlackPRs(source.channelName, state.lastPollAt || undefined)
+    // For Slack, only pass `since` if we already have PRs from this source.
+    // On first poll of a new source, fetch without time filter to get existing PR links.
+    const hasExistingPRs = state.prs.some((p) => p.sourceId === source.id)
+    const since = hasExistingPRs ? (state.lastPollAt || undefined) : undefined
+
+    const result = await fetchSlackPRs(source.channelName, since)
     if (result.error) {
       emitPollError(result.error)
     }
