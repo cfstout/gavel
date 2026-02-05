@@ -166,3 +166,8 @@
   border-color: var(--color-accent-red);
   color: var(--color-accent-red);
 }
+
+.action-btn.refine:hover {
+  background-color: rgba(88, 166, 255, 0.2);
+  border-color: var(--color-accent-blue);
+}

@@ -3,14 +3,17 @@ import { useReviewStore, useApprovedComments } from '../store/reviewStore'
 import { DiffViewer } from './DiffViewer'
 import { FileTree } from './FileTree'
 import { CommentList } from './CommentList'
+import { ChatPanel } from './ChatPanel'
+import { SubmitModal } from './SubmitModal'
+import type { ReviewComment } from '@shared/types'
 import './ReviewScreen.css'
 
 interface ReviewScreenProps {
-  onSubmit: () => void
+  onSubmitSuccess: () => void
   onBack: () => void
 }
 
-export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
+export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
   const { prData, comments, selectedPersona } = useReviewStore()
   const approvedComments = useApprovedComments()
 
@@ -18,6 +21,8 @@ export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
     prData?.files[0]?.filename ?? null
   )
   const [showCommentPanel, setShowCommentPanel] = useState(true)
+  const [refiningComment, setRefiningComment] = useState<ReviewComment | null>(null)
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
 
   // Get comments for the selected file
   const fileComments = useMemo(() => {
@@ -30,6 +35,10 @@ export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
     if (!selectedFile || !prData?.diff) return ''
     return extractFileDiff(prData.diff, selectedFile)
   }, [prData?.diff, selectedFile])
+
+  const handleRefine = (comment: ReviewComment) => {
+    setRefiningComment(comment)
+  }
 
   if (!prData) {
     return <div className="review-screen">No PR data loaded</div>
@@ -58,7 +67,7 @@ export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
           </button>
           <button
             className="primary"
-            onClick={onSubmit}
+            onClick={() => setShowSubmitModal(true)}
             disabled={approvedComments.length === 0}
           >
             Submit {approvedComments.length > 0 && `(${approvedComments.length})`}
@@ -92,9 +101,24 @@ export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
           <CommentList
             comments={comments}
             onFileClick={(file) => setSelectedFile(file)}
+            onRefine={handleRefine}
           />
         )}
       </div>
+
+      {refiningComment && (
+        <ChatPanel
+          comment={refiningComment}
+          onClose={() => setRefiningComment(null)}
+        />
+      )}
+
+      {showSubmitModal && (
+        <SubmitModal
+          onClose={() => setShowSubmitModal(false)}
+          onSuccess={onSubmitSuccess}
+        />
+      )}
     </div>
   )
 }
@@ -105,7 +129,7 @@ export function ReviewScreen({ onSubmit, onBack }: ReviewScreenProps) {
 function extractFileDiff(fullDiff: string, filename: string): string {
   const lines = fullDiff.split('\n')
   let inFile = false
-  let fileLines: string[] = []
+  const fileLines: string[] = []
 
   for (const line of lines) {
     if (line.startsWith('diff --git')) {

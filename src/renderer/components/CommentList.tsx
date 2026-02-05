@@ -5,9 +5,10 @@ import './CommentList.css'
 interface CommentListProps {
   comments: ReviewComment[]
   onFileClick: (file: string) => void
+  onRefine: (comment: ReviewComment) => void
 }
 
-export function CommentList({ comments, onFileClick }: CommentListProps) {
+export function CommentList({ comments, onFileClick, onRefine }: CommentListProps) {
   const { updateCommentStatus } = useReviewStore()
 
   const pendingComments = comments.filter((c) => c.status === 'pending')
@@ -34,6 +35,7 @@ export function CommentList({ comments, onFileClick }: CommentListProps) {
                 comment={comment}
                 onApprove={() => updateCommentStatus(comment.id, 'approved')}
                 onReject={() => updateCommentStatus(comment.id, 'rejected')}
+                onRefine={() => onRefine(comment)}
                 onFileClick={onFileClick}
               />
             ))}
@@ -52,6 +54,7 @@ export function CommentList({ comments, onFileClick }: CommentListProps) {
                 comment={comment}
                 onApprove={() => updateCommentStatus(comment.id, 'approved')}
                 onReject={() => updateCommentStatus(comment.id, 'rejected')}
+                onRefine={() => onRefine(comment)}
                 onFileClick={onFileClick}
               />
             ))}
@@ -70,6 +73,7 @@ export function CommentList({ comments, onFileClick }: CommentListProps) {
                 comment={comment}
                 onApprove={() => updateCommentStatus(comment.id, 'approved')}
                 onReject={() => updateCommentStatus(comment.id, 'rejected')}
+                onRefine={() => onRefine(comment)}
                 onFileClick={onFileClick}
               />
             ))}
@@ -90,6 +94,7 @@ interface CommentCardProps {
   comment: ReviewComment
   onApprove: () => void
   onReject: () => void
+  onRefine: () => void
   onFileClick: (file: string) => void
 }
 
@@ -97,6 +102,7 @@ function CommentCard({
   comment,
   onApprove,
   onReject,
+  onRefine,
   onFileClick,
 }: CommentCardProps) {
   const shortFile = comment.file.split('/').pop()
@@ -133,6 +139,13 @@ function CommentCard({
           title="Reject comment"
         >
           ✗
+        </button>
+        <button
+          className="action-btn refine"
+          onClick={onRefine}
+          title="Refine comment"
+        >
+          💬
         </button>
       </div>
     </div>

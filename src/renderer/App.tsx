@@ -34,8 +34,9 @@ export default function App() {
     setScreen('persona-select')
   }, [setScreen])
 
-  const handleReviewSubmit = useCallback(() => {
-    setScreen('submitting')
+  const handleReviewSubmitSuccess = useCallback(() => {
+    // After successful submission, go back to PR input for next review
+    setScreen('pr-input')
   }, [setScreen])
 
   const renderScreen = () => {
@@ -59,17 +60,9 @@ export default function App() {
       case 'review':
         return (
           <ReviewScreen
-            onSubmit={handleReviewSubmit}
+            onSubmitSuccess={handleReviewSubmitSuccess}
             onBack={handleReviewBack}
           />
-        )
-
-      case 'submitting':
-        // TODO: Phase 6 - Comment System
-        return (
-          <div className="placeholder-screen">
-            <h2>Submitting...</h2>
-          </div>
         )
 
       default:
