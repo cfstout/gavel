@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { PRSource, GitHubSearchSource, SlackChannelSource } from '@shared/types'
+import type { GitHubSearchSource, SlackChannelSource } from '@shared/types'
 import { useInboxStore } from '../store/inboxStore'
 
 interface SourceConfigModalProps {
