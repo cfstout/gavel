@@ -1,23 +1,27 @@
 # Gavel
 
-A local-first AI code review assistant that helps you conduct GitHub PR reviews with Claude.
+A local-first AI code review assistant with a kanban-style PR inbox that helps you manage and conduct GitHub PR reviews with Claude.
 
 ![Gavel Screenshot](docs/screenshot.png)
 
 ## What is Gavel?
 
-Gavel acts as a "staging area" for AI-generated code reviews. It:
+Gavel transforms PR review from a chore into a streamlined workflow. It provides a **PR Inbox** that automatically tracks pull requests from your configured sources, then helps you review them with AI assistance.
 
-1. Fetches a GitHub Pull Request
-2. Analyzes the diff using Claude with your chosen review persona
-3. Presents AI-generated comments for your review
-4. Lets you approve, reject, or refine each comment
-5. Batch-posts your approved comments to GitHub
+**The Workflow:**
+
+1. **Inbox** — PRs from GitHub searches or Slack channels appear here
+2. **Review** — Select a PR, choose a review persona, get AI-generated comments
+3. **Refine** — Approve, reject, or chat with Claude to refine each comment
+4. **Submit** — Post approved comments to GitHub; PR moves to "Reviewed"
+5. **Track** — PRs with new commits move to "Needs Attention"; merged PRs auto-clear
 
 **Key Features:**
-- Comments are staged locally—nothing is posted until you explicitly approve and submit
-- Session persistence—quit mid-review and pick up where you left off
-- Inline diff comments—see AI suggestions directly on the code they reference
+- **Kanban inbox** — Four columns: Inbox, Needs Attention, Reviewed, Done
+- **Multiple PR sources** — GitHub search queries and Slack channel monitoring
+- **Change detection** — New commits on reviewed PRs trigger re-review prompts
+- **Local staging** — Nothing posts until you explicitly approve and submit
+- **Session persistence** — Quit mid-review and pick up where you left off
 
 ## Prerequisites
 
@@ -39,6 +43,10 @@ Before using Gavel, you need:
    claude login
    ```
 
+3. **Slack MCP Plugin** (optional) — for Slack channel monitoring
+   - Enable the Slack MCP plugin in Claude Code settings
+   - Authenticate with your Slack workspace
+
 ## Installation
 
 ```bash
@@ -58,22 +66,49 @@ npm run build
 
 ## Usage
 
-1. **Start Gavel** — Run `npm run dev` or launch the built app
+### Setting Up PR Sources
 
-2. **Enter a PR** — Use `owner/repo#123` format or paste a GitHub PR URL
+When you first launch Gavel, you'll see an empty inbox. Click **"Add PR Source"** to configure where to find PRs:
 
-3. **Select a Review Persona** — Choose what type of review you want:
+**GitHub Search Sources:**
+- `review-requested:@me` — PRs where you're requested as reviewer
+- `author:@me is:open` — Your open PRs
+- `involves:@me` — PRs you're involved in
+- `org:mycompany is:pr is:open` — All open PRs in an organization
+
+**Slack Channel Sources:**
+- Enter a channel name (e.g., `code-reviews`) to monitor for PR links
+- Requires Slack MCP plugin to be enabled
+
+### The Kanban Board
+
+| Column | Description |
+|--------|-------------|
+| **Inbox** | New PRs from your sources |
+| **Needs Attention** | PRs with new commits since your last review |
+| **Reviewed** | PRs you've submitted comments on |
+| **Done** | Merged/closed PRs (auto-clears after 24 hours) |
+
+### Reviewing a PR
+
+1. Click **"Review"** on any PR card
+2. Select a review persona:
    - **General Review** — Balanced code quality review
-   - **Security Audit** — Focus on vulnerabilities (OWASP, auth, secrets)
-   - **Performance Review** — Efficiency, scalability, N+1 queries
-   - **Code Style** — Readability, naming, consistency
-
-4. **Review AI Comments** — For each comment:
+   - **Security Audit** — Focus on vulnerabilities
+   - **Performance Review** — Efficiency and scalability
+   - **Code Style** — Readability and consistency
+3. Wait for Claude to analyze the diff
+4. For each AI comment:
    - ✓ **Approve** — Mark for submission
    - ✗ **Reject** — Discard the comment
-   - 💬 **Refine** — Chat with Claude to modify the comment
+   - 💬 **Refine** — Chat with Claude to modify
+5. Click **Submit** to post approved comments
 
-5. **Submit** — Post all approved comments to GitHub
+### Manual PR Entry
+
+Click **"Enter a PR manually"** to review any PR not in your inbox:
+- Format: `owner/repo#123`
+- Or paste a GitHub PR URL
 
 ## Custom Personas
 
@@ -105,18 +140,33 @@ When commenting:
 
 ```
 gavel/
-├── electron/           # Electron main process
-│   ├── main.ts         # App entry point
-│   ├── github.ts       # GitHub CLI wrapper
-│   ├── claude.ts       # Claude CLI wrapper
-│   └── personas.ts     # Persona loading
+├── electron/              # Electron main process
+│   ├── main.ts            # App entry point
+│   ├── github.ts          # GitHub CLI wrapper (fetch, search, post)
+│   ├── claude.ts          # Claude CLI wrapper
+│   ├── personas.ts        # Persona loading
+│   ├── inbox.ts           # Inbox state persistence
+│   ├── polling.ts         # Background polling orchestration
+│   ├── slack.ts           # Slack MCP integration
+│   ├── ipc.ts             # IPC handler registration
+│   └── preload.ts         # Renderer API exposure
 ├── src/
-│   ├── renderer/       # React frontend
-│   │   ├── components/ # UI components
-│   │   ├── store/      # Zustand state
-│   │   └── hooks/      # React hooks
-│   └── shared/         # Shared types
-├── personas/           # Built-in review personas
+│   ├── renderer/          # React frontend
+│   │   ├── components/    # UI components
+│   │   │   ├── InboxScreen.tsx      # Kanban inbox view
+│   │   │   ├── KanbanColumn.tsx     # Column component
+│   │   │   ├── PRCard.tsx           # PR card component
+│   │   │   ├── SourceConfigModal.tsx # Source management
+│   │   │   └── ...                  # Review components
+│   │   ├── store/
+│   │   │   ├── reviewStore.ts       # Review session state
+│   │   │   └── inboxStore.ts        # Inbox state
+│   │   └── styles/
+│   │       ├── Inbox.css            # Inbox styles
+│   │       └── ...
+│   └── shared/
+│       └── types.ts       # Shared TypeScript types
+├── personas/              # Built-in review personas
 └── package.json
 ```
 
@@ -135,11 +185,15 @@ npm run build
 
 ## How It Works
 
-1. **GitHub Integration** — Uses `gh` CLI to fetch PR data and post comments. Your existing `gh auth` credentials are used—no additional authentication needed.
+1. **GitHub Integration** — Uses `gh` CLI for all GitHub operations. PR search, status checks, and comment posting all go through your authenticated `gh` session.
 
-2. **Claude Integration** — Uses `claude` CLI to analyze code. Your existing Claude Code authentication is used—no API keys required.
+2. **Polling** — Background polling (default: 5 minutes) checks your configured sources for new PRs and monitors existing PRs for changes (new commits, merges).
 
-3. **Local-First** — All data stays local until you explicitly submit. No servers, no cloud storage.
+3. **Claude Integration** — Uses `claude` CLI to analyze code diffs. Your Claude Code authentication is used—no API keys required.
+
+4. **Slack Integration** — When configured, monitors Slack channels for GitHub PR URLs using the Slack MCP plugin.
+
+5. **Local-First** — All state is stored locally. Nothing is sent to external servers except GitHub (for PRs) and Claude (for analysis).
 
 ## Troubleshooting
 
@@ -149,8 +203,20 @@ Run `gh auth login` and complete the authentication flow.
 ### "Claude CLI not found"
 Install Claude Code from https://claude.ai/code and run `claude login`.
 
-### "No comments generated"
-The AI found no issues worth commenting on. Try a different persona or check the PR has meaningful changes.
+### "Slack integration requires the Slack MCP plugin"
+1. Open Claude Code settings
+2. Enable the Slack MCP server
+3. Authenticate with your Slack workspace
+
+### PRs not appearing in inbox
+- Check that your source is enabled (Configure Sources > Active Sources)
+- Verify your GitHub search query returns results: `gh search prs "your query"`
+- For Slack sources, ensure the MCP plugin is configured
+
+### "Rate limited"
+GitHub API limits apply. Gavel will automatically back off and retry. If persistent, try:
+- Reducing the number of sources
+- Increasing poll interval in settings
 
 ### Comments not appearing on GitHub
 Ensure you have write access to the repository and the PR is still open.
