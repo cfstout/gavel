@@ -17,7 +17,7 @@ Gavel transforms PR review from a chore into a streamlined workflow. It provides
 5. **Track** — PRs with new commits move to "Needs Attention"; merged PRs auto-clear
 
 **Key Features:**
-- **Kanban inbox** — Four columns: Inbox, Needs Attention, Reviewed, Done
+- **Kanban inbox** — Four columns: Inbox, Reviewed, Needs Attention, Done
 - **Multiple PR sources** — GitHub search queries and Slack channel monitoring
 - **Change detection** — New commits on reviewed PRs trigger re-review prompts
 - **Local staging** — Nothing posts until you explicitly approve and submit
@@ -79,16 +79,17 @@ When you first launch Gavel, you'll see an empty inbox. Click **"Add PR Source"*
 - `org:mycompany is:pr is:open` — All open PRs in an organization
 
 **Slack Channel Sources:**
-- Enter a channel name (e.g., `code-reviews`) to monitor for PR links
-- Requires Slack MCP plugin to be enabled
+- Enter a channel name (e.g., `code-reviews`) or channel ID (e.g., `C09HBHLPK25`) to monitor for PR links
+- Using a channel ID avoids extra API calls and is recommended for large workspaces
+- Requires a Slack User OAuth Token (see Prerequisites)
 
 ### The Kanban Board
 
 | Column | Description |
 |--------|-------------|
 | **Inbox** | New PRs from your sources |
-| **Needs Attention** | PRs with new commits since your last review |
 | **Reviewed** | PRs you've submitted comments on |
+| **Needs Attention** | PRs with new commits since your last review |
 | **Done** | Merged/closed PRs (auto-clears after 24 hours) |
 
 ### Reviewing a PR
@@ -111,6 +112,7 @@ When you first launch Gavel, you'll see an empty inbox. Click **"Add PR Source"*
 Click **"Enter a PR manually"** to review any PR not in your inbox:
 - Format: `owner/repo#123`
 - Or paste a GitHub PR URL
+- After submitting a review, the PR is automatically added to your inbox and moved to the "Reviewed" column for tracking
 
 ## Custom Personas
 
@@ -149,7 +151,7 @@ gavel/
 │   ├── personas.ts        # Persona loading
 │   ├── inbox.ts           # Inbox state persistence
 │   ├── polling.ts         # Background polling orchestration
-│   ├── slack.ts           # Slack MCP integration
+│   ├── slack.ts           # Slack API integration
 │   ├── ipc.ts             # IPC handler registration
 │   └── preload.ts         # Renderer API exposure
 ├── src/
@@ -195,7 +197,9 @@ npm run build
 
 4. **Slack Integration** — When configured, calls the Slack API directly to fetch channel messages and extract GitHub PR URLs. Token stored securely via Electron's safeStorage.
 
-5. **Local-First** — All state is stored locally. Nothing is sent to external servers except GitHub (for PRs) and Claude (for analysis).
+5. **Deduplication** — PRs are identified by `owner/repo#number`. If the same PR appears across multiple sources, it only shows once in your inbox.
+
+6. **Local-First** — All state is stored locally. Nothing is sent to external servers except GitHub (for PRs) and Claude (for analysis).
 
 ## Troubleshooting
 
@@ -212,7 +216,8 @@ See Prerequisites for how to create a Slack app and get a token.
 ### PRs not appearing in inbox
 - Check that your source is enabled (Configure Sources > Active Sources)
 - Verify your GitHub search query returns results: `gh search prs "your query"`
-- For Slack sources, ensure the MCP plugin is configured
+- For Slack sources, ensure a valid User OAuth Token is configured and the token has access to the channel
+- Using a channel ID (e.g., `C09HBHLPK25`) instead of a channel name avoids rate limits on large workspaces
 
 ### "Rate limited"
 GitHub API limits apply. Gavel will automatically back off and retry. If persistent, try:
