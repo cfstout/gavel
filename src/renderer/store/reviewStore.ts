@@ -100,9 +100,3 @@ export const useReviewStore = create<ReviewState>((set) => ({
   reset: () => set(initialState),
 }))
 
-// Selector helpers
-export const useApprovedComments = () =>
-  useReviewStore((state) => state.comments.filter((c) => c.status === 'approved'))
-
-export const usePendingComments = () =>
-  useReviewStore((state) => state.comments.filter((c) => c.status === 'pending'))

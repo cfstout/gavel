@@ -1,8 +1,35 @@
-import { useMemo } from 'react'
+import { useMemo, Component, ReactNode } from 'react'
 import { Diff, Hunk, parseDiff } from 'react-diff-view'
 import type { ReviewComment } from '@shared/types'
 import 'react-diff-view/style/index.css'
 import './DiffViewer.css'
+
+// Error boundary to catch rendering errors in diff view
+class DiffErrorBoundary extends Component<
+  { children: ReactNode; filename: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode; filename: string }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="diff-viewer-error">
+          <p>Error rendering diff for {this.props.filename}</p>
+          <pre>{this.state.error?.message}</pre>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 interface DiffViewerProps {
   diff: string
@@ -11,12 +38,14 @@ interface DiffViewerProps {
 }
 
 export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
-  const files = useMemo(() => {
-    if (!diff) return []
+  const { files, parseError } = useMemo(() => {
+    if (!diff) return { files: [], parseError: null }
     try {
-      return parseDiff(diff)
-    } catch {
-      return []
+      const parsed = parseDiff(diff)
+      return { files: parsed, parseError: null }
+    } catch (err) {
+      console.error('Failed to parse diff:', err)
+      return { files: [], parseError: err instanceof Error ? err.message : 'Unknown error' }
     }
   }, [diff])
 
@@ -41,6 +70,15 @@ export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
     return result
   }, [comments])
 
+  if (parseError) {
+    return (
+      <div className="diff-viewer-error">
+        <p>Failed to parse diff for {filename}</p>
+        <pre>{parseError}</pre>
+      </div>
+    )
+  }
+
   if (files.length === 0) {
     return (
       <div className="diff-viewer-empty">
@@ -51,26 +89,37 @@ export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
 
   const file = files[0]
 
+  // Safety check for hunks
+  if (!file.hunks || file.hunks.length === 0) {
+    return (
+      <div className="diff-viewer-empty">
+        <p>No changes in {filename}</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="diff-viewer">
-      <div className="diff-header">
-        <span className="diff-filename">{filename}</span>
+    <DiffErrorBoundary filename={filename}>
+      <div className="diff-viewer">
+        <div className="diff-header">
+          <span className="diff-filename">{filename}</span>
+        </div>
+        <div className="diff-content">
+          <Diff
+            viewType="unified"
+            diffType={file.type}
+            hunks={file.hunks}
+            widgets={widgets}
+          >
+            {(hunks) =>
+              hunks.map((hunk) => (
+                <Hunk key={hunk.content} hunk={hunk} />
+              ))
+            }
+          </Diff>
+        </div>
       </div>
-      <div className="diff-content">
-        <Diff
-          viewType="unified"
-          diffType={file.type}
-          hunks={file.hunks}
-          widgets={widgets}
-        >
-          {(hunks) =>
-            hunks.map((hunk) => (
-              <Hunk key={hunk.content} hunk={hunk} />
-            ))
-          }
-        </Diff>
-      </div>
-    </div>
+    </DiffErrorBoundary>
   )
 }
 

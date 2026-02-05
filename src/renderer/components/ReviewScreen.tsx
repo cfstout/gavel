@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useReviewStore, useApprovedComments } from '../store/reviewStore'
+import { useReviewStore } from '../store/reviewStore'
 import { DiffViewer } from './DiffViewer'
 import { FileTree } from './FileTree'
 import { CommentList } from './CommentList'
@@ -15,7 +15,12 @@ interface ReviewScreenProps {
 
 export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
   const { prData, comments, selectedPersona } = useReviewStore()
-  const approvedComments = useApprovedComments()
+
+  // Compute approved comments with useMemo to avoid infinite loops
+  const approvedComments = useMemo(
+    () => comments.filter((c) => c.status === 'approved'),
+    [comments]
+  )
 
   const [selectedFile, setSelectedFile] = useState<string | null>(
     prData?.files[0]?.filename ?? null

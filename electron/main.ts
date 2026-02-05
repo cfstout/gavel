@@ -25,7 +25,7 @@ function createWindow() {
     minHeight: 700,
     title: 'Gavel',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },

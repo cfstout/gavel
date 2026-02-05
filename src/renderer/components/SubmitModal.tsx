@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useReviewStore, useApprovedComments } from '../store/reviewStore'
+import { useState, useMemo } from 'react'
+import { useReviewStore } from '../store/reviewStore'
 import type { ReviewComment } from '@shared/types'
 import './SubmitModal.css'
 
@@ -9,8 +9,11 @@ interface SubmitModalProps {
 }
 
 export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
-  const { prData, setSubmitting, setError, reset } = useReviewStore()
-  const approvedComments = useApprovedComments()
+  const { prData, comments, setSubmitting, setError, reset } = useReviewStore()
+  const approvedComments = useMemo(
+    () => comments.filter((c) => c.status === 'approved'),
+    [comments]
+  )
   const [isSubmitting, setIsSubmittingLocal] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 

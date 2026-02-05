@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, Component, ReactNode } from 'react'
 import { useReviewStore } from './store/reviewStore'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
@@ -6,8 +6,56 @@ import { AnalysisProgress } from './components/AnalysisProgress'
 import { ReviewScreen } from './components/ReviewScreen'
 import './styles/App.css'
 
+// Top-level error boundary to catch React crashes
+class AppErrorBoundary extends Component<
+  { children: ReactNode; onReset: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode; onReset: () => void }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('React error:', error, errorInfo)
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null })
+    this.props.onReset()
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="app">
+          <header className="app-header">
+            <h1>Gavel</h1>
+            <span className="tagline">AI Code Review Assistant</span>
+          </header>
+          <main className="app-content">
+            <div className="error-screen">
+              <h2>Something went wrong</h2>
+              <pre className="error-details">{this.state.error?.message}</pre>
+              <pre className="error-stack">{this.state.error?.stack}</pre>
+              <button className="primary" onClick={this.handleReset}>
+                Start Over
+              </button>
+            </div>
+          </main>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
-  const { screen, setScreen, error, setError } = useReviewStore()
+  const { screen, setScreen, error, setError, reset } = useReviewStore()
 
   const handlePRInputNext = useCallback(() => {
     setScreen('persona-select')
@@ -71,20 +119,22 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Gavel</h1>
-        <span className="tagline">AI Code Review Assistant</span>
-      </header>
-      <main className="app-content">
-        {error && (
-          <div className="global-error">
-            <span>{error}</span>
-            <button onClick={() => setError(null)}>Dismiss</button>
-          </div>
-        )}
-        {renderScreen()}
-      </main>
-    </div>
+    <AppErrorBoundary onReset={reset}>
+      <div className="app">
+        <header className="app-header">
+          <h1>Gavel</h1>
+          <span className="tagline">AI Code Review Assistant</span>
+        </header>
+        <main className="app-content">
+          {error && (
+            <div className="global-error">
+              <span>{error}</span>
+              <button onClick={() => setError(null)}>Dismiss</button>
+            </div>
+          )}
+          {renderScreen()}
+        </main>
+      </div>
+    </AppErrorBoundary>
   )
 }
