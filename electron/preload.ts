@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchSlackPRs: (channelName: string, since?: string) =>
     ipcRenderer.invoke('inbox:fetchSlackPRs', channelName, since),
 
+  // Slack token
+  hasSlackToken: () => ipcRenderer.invoke('slack:hasToken'),
+  saveSlackToken: (token: string) => ipcRenderer.invoke('slack:saveToken', token),
+
   // Polling operations
   startPolling: () => ipcRenderer.invoke('polling:start'),
   stopPolling: () => ipcRenderer.invoke('polling:stop'),

@@ -43,9 +43,11 @@ Before using Gavel, you need:
    claude login
    ```
 
-3. **Slack MCP Plugin** (optional) — for Slack channel monitoring
-   - Enable the Slack MCP plugin in Claude Code settings
-   - Authenticate with your Slack workspace
+3. **Slack User OAuth Token** (optional) — for Slack channel monitoring
+   - Create a Slack app at https://api.slack.com/apps
+   - Add User Token Scopes: `channels:history`, `channels:read`, `groups:history`, `groups:read`
+   - Install to your workspace and copy the User OAuth Token (`xoxp-...`)
+   - Either set `SLACK_USER_TOKEN` env var or enter the token in Gavel's source config
 
 ## Installation
 
@@ -191,7 +193,7 @@ npm run build
 
 3. **Claude Integration** — Uses `claude` CLI to analyze code diffs. Your Claude Code authentication is used—no API keys required.
 
-4. **Slack Integration** — When configured, monitors Slack channels for GitHub PR URLs using the Slack MCP plugin.
+4. **Slack Integration** — When configured, calls the Slack API directly to fetch channel messages and extract GitHub PR URLs. Token stored securely via Electron's safeStorage.
 
 5. **Local-First** — All state is stored locally. Nothing is sent to external servers except GitHub (for PRs) and Claude (for analysis).
 
@@ -203,10 +205,9 @@ Run `gh auth login` and complete the authentication flow.
 ### "Claude CLI not found"
 Install Claude Code from https://claude.ai/code and run `claude login`.
 
-### "Slack integration requires the Slack MCP plugin"
-1. Open Claude Code settings
-2. Enable the Slack MCP server
-3. Authenticate with your Slack workspace
+### "No Slack token configured"
+Either set the `SLACK_USER_TOKEN` environment variable or enter a token in Configure Sources > Slack Channel.
+See Prerequisites for how to create a Slack app and get a token.
 
 ### PRs not appearing in inbox
 - Check that your source is enabled (Configure Sources > Active Sources)

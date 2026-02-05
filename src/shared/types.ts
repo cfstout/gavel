@@ -158,6 +158,9 @@ export interface ElectronAPI {
   loadInboxState: () => Promise<InboxState>
   saveInboxState: (state: InboxState) => Promise<void>
   fetchSlackPRs: (channelName: string, since?: string) => Promise<GitHubSearchPR[]>
+  // Slack token
+  hasSlackToken: () => Promise<boolean>
+  saveSlackToken: (token: string) => Promise<void>
   // Polling
   startPolling: () => void
   stopPolling: () => void

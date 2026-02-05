@@ -4,7 +4,7 @@ import { analyzePR, refinementChat, checkClaudeAuth } from './claude'
 import { loadPersonas } from './personas'
 import { saveState, loadState, clearState } from './persistence'
 import { loadInboxState, saveInboxState } from './inbox'
-import { fetchSlackPRs } from './slack'
+import { fetchSlackPRs, hasSlackToken, saveSlackToken } from './slack'
 import { startPolling, stopPolling, triggerPoll } from './polling'
 import type { ReviewComment, Persona, PersistedState, InboxState } from '../src/shared/types'
 
@@ -109,6 +109,15 @@ export function registerIpcHandlers(): void {
       throw new Error(result.error)
     }
     return result.prs
+  })
+
+  // Slack token handlers
+  ipcMain.handle('slack:hasToken', async () => {
+    return hasSlackToken()
+  })
+
+  ipcMain.handle('slack:saveToken', async (_event, token: string) => {
+    return saveSlackToken(token)
   })
 
   // Polling handlers

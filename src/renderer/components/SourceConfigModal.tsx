@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { GitHubSearchSource, SlackChannelSource } from '@shared/types'
 import { useInboxStore } from '../store/inboxStore'
 
@@ -15,8 +15,37 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
   const [name, setName] = useState('')
   const [query, setQuery] = useState('')
   const [channelName, setChannelName] = useState('')
+  const [slackToken, setSlackToken] = useState('')
+  const [hasToken, setHasToken] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingToken, setIsSavingToken] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tokenSaved, setTokenSaved] = useState(false)
+
+  // Check if Slack token is configured on mount
+  useEffect(() => {
+    window.electronAPI.hasSlackToken().then(setHasToken)
+  }, [])
+
+  const handleSaveToken = async () => {
+    if (!slackToken.trim()) return
+
+    setIsSavingToken(true)
+    setError(null)
+
+    try {
+      await window.electronAPI.saveSlackToken(slackToken.trim())
+      setHasToken(true)
+      setSlackToken('')
+      setTokenSaved(true)
+      setTimeout(() => setTokenSaved(false), 3000)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save token'
+      setError(message)
+    } finally {
+      setIsSavingToken(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +63,11 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
 
     if (sourceType === 'slack' && !channelName.trim()) {
       setError('Please enter a Slack channel name')
+      return
+    }
+
+    if (sourceType === 'slack' && !hasToken) {
+      setError('Please configure a Slack token first')
       return
     }
 
@@ -98,15 +132,51 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
               className={`source-type-tab ${sourceType === 'github-search' ? 'active' : ''}`}
               onClick={() => setSourceType('github-search')}
             >
-              🔍 GitHub Search
+              GitHub Search
             </button>
             <button
               className={`source-type-tab ${sourceType === 'slack' ? 'active' : ''}`}
               onClick={() => setSourceType('slack')}
             >
-              💬 Slack Channel
+              Slack Channel
             </button>
           </div>
+
+          {sourceType === 'slack' && !hasToken && (
+            <div className="source-form" style={{ marginBottom: 16 }}>
+              <div className="source-form-field">
+                <label htmlFor="slack-token">Slack User OAuth Token</label>
+                <input
+                  id="slack-token"
+                  type="password"
+                  value={slackToken}
+                  onChange={(e) => setSlackToken(e.target.value)}
+                  placeholder="xoxp-..."
+                  disabled={isSavingToken}
+                />
+                <span className="hint">
+                  Create a Slack app with <code>channels:history</code>, <code>channels:read</code>,
+                  <code>groups:history</code>, and <code>groups:read</code> scopes.
+                  Or set the <code>SLACK_USER_TOKEN</code> env var.
+                </span>
+              </div>
+              <button
+                className="primary"
+                onClick={handleSaveToken}
+                disabled={isSavingToken || !slackToken.trim()}
+              >
+                {isSavingToken ? 'Saving...' : 'Save Token'}
+              </button>
+            </div>
+          )}
+
+          {sourceType === 'slack' && hasToken && (
+            <div className="source-form-field" style={{ marginBottom: 16 }}>
+              <span className="hint" style={{ color: 'var(--color-accent-green)' }}>
+                Slack token configured {tokenSaved ? '(just saved)' : ''}
+              </span>
+            </div>
+          )}
 
           <form className="source-form" onSubmit={handleSubmit}>
             <div className="source-form-field">
@@ -150,12 +220,11 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
                   placeholder="code-reviews"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !hasToken}
                 />
                 <span className="hint">
                   Enter the channel name without the # symbol.
-                  <br />
-                  Requires Claude Code Slack MCP plugin to be configured.
+                  Works with both public and private channels.
                 </span>
               </div>
             )}
@@ -174,7 +243,7 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
                 <div key={source.id} className="source-item">
                   <div className="source-item-info">
                     <span className="source-item-name">
-                      {source.type === 'github-search' ? '🔍' : '💬'} {source.name}
+                      {source.type === 'github-search' ? 'GH' : 'Slack'}: {source.name}
                     </span>
                     <span className="source-item-detail">
                       {source.type === 'github-search'
