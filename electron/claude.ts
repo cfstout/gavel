@@ -3,6 +3,78 @@ import { BrowserWindow } from 'electron'
 import type { ReviewComment } from '../src/shared/types'
 
 /**
+ * Parse a diff to extract valid line ranges for each file
+ * Returns a map of file path -> Set of valid line numbers
+ */
+export function parseValidDiffLines(diff: string): Map<string, Set<number>> {
+  const validLines = new Map<string, Set<number>>()
+  let currentFile: string | null = null
+  let newLineNum = 0
+
+  for (const line of diff.split('\n')) {
+    // Match file header: diff --git a/path b/path
+    const fileMatch = line.match(/^diff --git a\/.+ b\/(.+)$/)
+    if (fileMatch) {
+      currentFile = fileMatch[1]
+      if (!validLines.has(currentFile)) {
+        validLines.set(currentFile, new Set())
+      }
+      continue
+    }
+
+    // Match hunk header: @@ -old,count +new,count @@
+    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunkMatch) {
+      newLineNum = parseInt(hunkMatch[1], 10)
+      continue
+    }
+
+    // Track line numbers in the hunk
+    if (currentFile && newLineNum > 0) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        // Added line - valid for comments
+        validLines.get(currentFile)!.add(newLineNum)
+        newLineNum++
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        // Deleted line - don't increment new line number
+      } else if (!line.startsWith('\\')) {
+        // Context line - valid for comments
+        validLines.get(currentFile)!.add(newLineNum)
+        newLineNum++
+      }
+    }
+  }
+
+  return validLines
+}
+
+/**
+ * Validate comments against the diff and mark invalid ones
+ */
+export function validateComments(
+  comments: ReviewComment[],
+  diff: string
+): ReviewComment[] {
+  const validLines = parseValidDiffLines(diff)
+
+  return comments.map((comment) => {
+    const fileLines = validLines.get(comment.file)
+    const isValid = fileLines?.has(comment.line) ?? false
+
+    if (!isValid) {
+      // Mark as invalid by adding a note to the message
+      return {
+        ...comment,
+        status: 'rejected' as const,
+        message: `[LINE NOT IN DIFF - Cannot post to GitHub]\n\n${comment.message}`,
+      }
+    }
+
+    return comment
+  })
+}
+
+/**
  * Generate a unique ID for comments
  */
 function generateId(): string {
@@ -54,7 +126,9 @@ export async function analyzePR(
       } else {
         try {
           const comments = parseClaudeResponse(stdout)
-          resolve(comments)
+          // Validate comments against the diff and mark invalid ones
+          const validatedComments = validateComments(comments, diff)
+          resolve(validatedComments)
         } catch (err) {
           reject(new Error(`Failed to parse Claude response: ${err}`))
         }
@@ -122,33 +196,50 @@ function buildAnalysisPrompt(diff: string, personaContent: string): string {
 ## Review Instructions
 ${personaContent}
 
+## CRITICAL: Line Number Rules
+You can ONLY comment on lines that appear in the diff hunks. Each hunk starts with @@ and shows line ranges.
+
+For example, if you see:
+\`\`\`
+@@ -10,6 +10,8 @@ function example() {
+   existing line      <- This is line 10 (context)
+   another line       <- This is line 11 (context)
++  new line           <- This is line 12 (added - you CAN comment here)
++  another new        <- This is line 13 (added - you CAN comment here)
+   more context       <- This is line 14 (context)
+\`\`\`
+
+The "+10,8" means the new file starts at line 10 and shows 8 lines. You can ONLY use line numbers that appear in the hunk (10-17 in this example).
+
+DO NOT guess line numbers outside the diff. If you want to comment on code not shown in the diff, you cannot - skip it.
+
 ## Output Format
-You MUST respond with a JSON array of review comments. Each comment should have:
-- file: the file path
-- line: the line number in the NEW version of the file (from the + lines in the diff)
-- message: your review comment (be specific and actionable)
+Respond with a JSON array. Each comment needs:
+- file: exact file path from the diff (e.g., "src/utils.ts")
+- line: line number from the NEW version (right side of diff) - MUST be within a hunk
+- message: specific, actionable feedback
 - severity: "suggestion" | "warning" | "critical"
 
-Example output:
+Example:
 \`\`\`json
 [
   {
     "file": "src/utils.ts",
     "line": 42,
-    "message": "Consider using a Map instead of an object for better performance with frequent lookups.",
+    "message": "Consider using a Map for O(1) lookups instead of repeated array.find() calls.",
     "severity": "suggestion"
   }
 ]
 \`\`\`
 
-If there are no issues to report, return an empty array: []
+Return an empty array [] if no issues found.
 
 ## Pull Request Diff
 \`\`\`diff
 ${diff}
 \`\`\`
 
-Now analyze this diff and return ONLY the JSON array of comments, no other text.`
+Analyze this diff and return ONLY the JSON array. Remember: only use line numbers actually shown in the hunks above.`
 }
 
 /**
