@@ -156,7 +156,6 @@ export async function postComments(
   const payload = JSON.stringify({
     commit_id: commitSha,
     event: 'COMMENT', // Submit immediately (not pending)
-    body: 'Review by Gavel',
     comments: reviewComments,
   })
 
