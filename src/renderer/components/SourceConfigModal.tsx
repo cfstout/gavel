@@ -223,8 +223,8 @@ export function SourceConfigModal({ onClose }: SourceConfigModalProps) {
                   disabled={isSubmitting || !hasToken}
                 />
                 <span className="hint">
-                  Enter the channel name without the # symbol.
-                  Works with both public and private channels.
+                  Channel name (without #) or channel ID (e.g., C09HBHLPK25).
+                  Using a channel ID avoids extra API calls.
                 </span>
               </div>
             )}

@@ -71,9 +71,9 @@ export async function hasSlackToken(): Promise<boolean> {
 // --- Slack API ---
 
 /**
- * Make a Slack API call
+ * Make a Slack API call with retry on rate limit
  */
-async function slackAPI<T>(method: string, params: Record<string, string> = {}): Promise<T> {
+async function slackAPI<T>(method: string, params: Record<string, string> = {}, retries = 2): Promise<T> {
   const token = await getSlackToken()
   if (!token) {
     throw new Error('No Slack token configured. Set SLACK_USER_TOKEN env var or enter a token in Settings.')
@@ -88,6 +88,13 @@ async function slackAPI<T>(method: string, params: Record<string, string> = {}):
     headers: { Authorization: `Bearer ${token}` },
   })
 
+  // Handle rate limiting with Retry-After
+  if (response.status === 429 && retries > 0) {
+    const retryAfter = parseInt(response.headers.get('Retry-After') || '5', 10)
+    await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000))
+    return slackAPI<T>(method, params, retries - 1)
+  }
+
   if (!response.ok) {
     throw new Error(`Slack API error: ${response.status} ${response.statusText}`)
   }
@@ -101,13 +108,22 @@ async function slackAPI<T>(method: string, params: Record<string, string> = {}):
   return data
 }
 
+// Slack channel IDs match this pattern (e.g., C09HBHLPK25)
+const CHANNEL_ID_REGEX = /^[CDG][A-Z0-9]+$/
+
 /**
- * Resolve a channel name to its ID
- * Paginates through conversations.list to find the match
+ * Resolve a channel name or ID to a channel ID
+ * If the input looks like a channel ID, use it directly.
+ * Otherwise, paginate through conversations.list to find it.
  */
 async function resolveChannelId(channelName: string): Promise<string> {
   // Strip # prefix if present
   const name = channelName.replace(/^#/, '')
+
+  // If it looks like a channel ID already, use it directly
+  if (CHANNEL_ID_REGEX.test(name)) {
+    return name
+  }
 
   // Check cache
   const cached = channelIdCache.get(name)
