@@ -1,5 +1,12 @@
 import { spawn } from 'node:child_process'
-import type { PRData, PRMetadata, PRFile, ReviewComment } from '../src/shared/types'
+import type {
+  PRData,
+  PRMetadata,
+  PRFile,
+  ReviewComment,
+  GitHubSearchPR,
+  PRStatusResult,
+} from '../src/shared/types'
 
 interface GhPRResponse {
   number: number
@@ -282,5 +289,85 @@ export async function checkAuth(): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+interface GhSearchResult {
+  number: number
+  title: string
+  author: { login: string }
+  repository: { nameWithOwner: string }
+  url: string
+  headRefOid: string
+  state: string
+  isDraft: boolean
+}
+
+/**
+ * Search for PRs using a GitHub search query
+ */
+export async function searchPRs(query: string): Promise<GitHubSearchPR[]> {
+  const result = await execGh([
+    'search',
+    'prs',
+    query,
+    '--json',
+    'number,title,author,repository,url,headRefOid,state,isDraft',
+    '--limit',
+    '50',
+  ])
+
+  const prs = JSON.parse(result) as GhSearchResult[]
+
+  return prs.map((pr) => {
+    const [owner, repo] = pr.repository.nameWithOwner.split('/')
+    return {
+      owner,
+      repo,
+      number: pr.number,
+      title: pr.title,
+      author: pr.author.login,
+      url: pr.url,
+      headSha: pr.headRefOid,
+      state: mapPRState(pr.state),
+    }
+  })
+}
+
+/**
+ * Get the current status of a PR (for detecting changes)
+ */
+export async function getPRStatus(prRef: string): Promise<PRStatusResult> {
+  const { owner, repo, number } = parsePRReference(prRef)
+
+  const result = await execGh([
+    'pr',
+    'view',
+    String(number),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'headRefOid,state,mergedAt',
+  ])
+
+  const data = JSON.parse(result) as { headRefOid: string; state: string; mergedAt: string | null }
+
+  return {
+    headSha: data.headRefOid,
+    state: data.mergedAt ? 'merged' : mapPRState(data.state),
+  }
+}
+
+/**
+ * Map GitHub PR state strings to our state type
+ */
+function mapPRState(state: string): 'open' | 'closed' | 'merged' {
+  switch (state.toUpperCase()) {
+    case 'MERGED':
+      return 'merged'
+    case 'CLOSED':
+      return 'closed'
+    default:
+      return 'open'
   }
 }
