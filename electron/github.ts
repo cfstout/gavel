@@ -17,12 +17,20 @@ interface GhPRResponse {
 
 /**
  * Execute a gh CLI command and return the output
+ * @param args - Command arguments
+ * @param stdin - Optional stdin input (for --input -)
  */
-async function execGh(args: string[]): Promise<string> {
+async function execGh(args: string[], stdin?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn('gh', args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [stdin ? 'pipe' : 'ignore', 'pipe', 'pipe'],
     })
+
+    // Write stdin if provided
+    if (stdin && proc.stdin) {
+      proc.stdin.write(stdin)
+      proc.stdin.end()
+    }
 
     let stdout = ''
     let stderr = ''
@@ -127,7 +135,7 @@ export async function fetchPR(prRef: string): Promise<PRData> {
 
 /**
  * Post review comments to a PR using gh API
- * Returns info about which comments succeeded/failed
+ * Uses the "Create a review" endpoint to batch all comments into one review
  */
 export async function postComments(
   prRef: string,
@@ -136,50 +144,93 @@ export async function postComments(
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const { owner, repo, number } = parsePRReference(prRef)
 
+  // Build the review payload with all comments
+  const reviewComments = comments.map((c) => ({
+    path: c.file,
+    line: c.line,
+    side: 'RIGHT',
+    body: formatCommentBody(c),
+  }))
+
+  // Create the review JSON payload
+  const payload = JSON.stringify({
+    commit_id: commitSha,
+    event: 'COMMENT', // Submit immediately (not pending)
+    body: 'Review by Gavel',
+    comments: reviewComments,
+  })
+
+  try {
+    await execGh([
+      'api',
+      '--method',
+      'POST',
+      `/repos/${owner}/${repo}/pulls/${number}/reviews`,
+      '--input',
+      '-',
+    ], payload)
+
+    return { posted: comments.length, failed: [] }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+
+    // Try to parse the error to see if specific comments failed
+    // GitHub returns errors for individual comments in the response
+    if (errorMsg.includes('Validation Failed')) {
+      // If the batch fails, try posting comments individually as a fallback
+      // This helps identify which specific comments are problematic
+      return await postCommentsIndividually(owner, repo, number, comments, commitSha)
+    }
+
+    throw new Error(`Failed to create review: ${errorMsg}`)
+  }
+}
+
+/**
+ * Fallback: post comments individually to identify which ones fail
+ */
+async function postCommentsIndividually(
+  owner: string,
+  repo: string,
+  number: number,
+  comments: ReviewComment[],
+  commitSha: string
+): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const results = { posted: 0, failed: [] as Array<{ file: string; line: number; error: string }> }
 
-  // Post each comment individually using the pull request review comments API
   for (const comment of comments) {
+    // Create a single-comment review for each
+    const payload = JSON.stringify({
+      commit_id: commitSha,
+      event: 'COMMENT',
+      comments: [{
+        path: comment.file,
+        line: comment.line,
+        side: 'RIGHT',
+        body: formatCommentBody(comment),
+      }],
+    })
+
     try {
       await execGh([
         'api',
         '--method',
         'POST',
-        `/repos/${owner}/${repo}/pulls/${number}/comments`,
-        '-f',
-        `body=${formatCommentBody(comment)}`,
-        '-f',
-        `path=${comment.file}`,
-        '-F',
-        `line=${comment.line}`, // -F sends as raw JSON (integer)
-        '-f',
-        `commit_id=${commitSha}`,
-        '-f',
-        'side=RIGHT', // Comment on the new version of the file
-        '-f',
-        'subject_type=line', // Required for line comments
-      ])
+        `/repos/${owner}/${repo}/pulls/${number}/reviews`,
+        '--input',
+        '-',
+      ], payload)
       results.posted++
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      // Check if it's a line-not-in-diff error
-      if (errorMsg.includes('422') || errorMsg.includes('Validation Failed')) {
-        results.failed.push({
-          file: comment.file,
-          line: comment.line,
-          error: `Line ${comment.line} is not part of the diff - comment skipped`,
-        })
-      } else {
-        results.failed.push({
-          file: comment.file,
-          line: comment.line,
-          error: errorMsg,
-        })
-      }
+      results.failed.push({
+        file: comment.file,
+        line: comment.line,
+        error: errorMsg.slice(0, 200),
+      })
     }
   }
 
-  // If all comments failed, throw an error
   if (results.posted === 0 && results.failed.length > 0) {
     const failureDetails = results.failed
       .map((f) => `  ${f.file}:${f.line} - ${f.error}`)
