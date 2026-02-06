@@ -82,6 +82,9 @@ export interface Persona {
   isBuiltIn: boolean
 }
 
+// Review event types for GitHub review submission
+export type ReviewEventType = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+
 // Review comment states
 export type CommentStatus = 'pending' | 'approved' | 'rejected' | 'refining'
 
@@ -145,7 +148,7 @@ export interface ElectronAPI {
   checkGitHubAuth: () => Promise<boolean>
   fetchPR: (prUrl: string) => Promise<PRData>
   fetchPRBody: (prRef: string) => Promise<string>
-  postComments: (prUrl: string, comments: ReviewComment[]) => Promise<PostCommentsResult>
+  postComments: (prUrl: string, comments: ReviewComment[], reviewType: ReviewEventType) => Promise<PostCommentsResult>
   searchPRs: (query: string) => Promise<GitHubSearchPR[]>
   getPRStatus: (prRef: string) => Promise<PRStatusResult>
   // Claude

@@ -6,7 +6,7 @@ import { saveState, loadState, clearState } from './persistence'
 import { loadInboxState, saveInboxState } from './inbox'
 import { fetchSlackPRs, hasSlackToken, saveSlackToken } from './slack'
 import { startPolling, stopPolling, triggerPoll } from './polling'
-import type { ReviewComment, Persona, PersistedState, InboxState } from '../src/shared/types'
+import type { ReviewComment, ReviewEventType, Persona, PersistedState, InboxState } from '../src/shared/types'
 
 // Cache for personas and conversation context
 let personasCache: Persona[] | null = null
@@ -29,9 +29,9 @@ export function registerIpcHandlers(): void {
     return fetchPRBody(prRef)
   })
 
-  ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[]) => {
+  ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[], reviewType: ReviewEventType) => {
     const commitSha = await getPRHeadSha(prRef)
-    return postComments(prRef, comments, commitSha)
+    return postComments(prRef, comments, commitSha, reviewType)
   })
 
   // Claude handlers

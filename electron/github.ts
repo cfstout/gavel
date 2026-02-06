@@ -4,6 +4,7 @@ import type {
   PRMetadata,
   PRFile,
   ReviewComment,
+  ReviewEventType,
   GitHubSearchPR,
   PRStatusResult,
 } from '../src/shared/types'
@@ -147,7 +148,8 @@ export async function fetchPR(prRef: string): Promise<PRData> {
 export async function postComments(
   prRef: string,
   comments: ReviewComment[],
-  commitSha: string
+  commitSha: string,
+  reviewType: ReviewEventType = 'COMMENT'
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const { owner, repo, number } = parsePRReference(prRef)
 
@@ -162,7 +164,7 @@ export async function postComments(
   // Create the review JSON payload
   const payload = JSON.stringify({
     commit_id: commitSha,
-    event: 'COMMENT', // Submit immediately (not pending)
+    event: reviewType,
     comments: reviewComments,
   })
 
@@ -185,7 +187,7 @@ export async function postComments(
     if (errorMsg.includes('Validation Failed')) {
       // If the batch fails, try posting comments individually as a fallback
       // This helps identify which specific comments are problematic
-      return await postCommentsIndividually(owner, repo, number, comments, commitSha)
+      return await postCommentsIndividually(owner, repo, number, comments, commitSha, reviewType)
     }
 
     throw new Error(`Failed to create review: ${errorMsg}`)
@@ -200,7 +202,8 @@ async function postCommentsIndividually(
   repo: string,
   number: number,
   comments: ReviewComment[],
-  commitSha: string
+  commitSha: string,
+  reviewType: ReviewEventType = 'COMMENT'
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const results = { posted: 0, failed: [] as Array<{ file: string; line: number; error: string }> }
 
@@ -208,7 +211,7 @@ async function postCommentsIndividually(
     // Create a single-comment review for each
     const payload = JSON.stringify({
       commit_id: commitSha,
-      event: 'COMMENT',
+      event: reviewType,
       comments: [{
         path: comment.file,
         line: comment.line,

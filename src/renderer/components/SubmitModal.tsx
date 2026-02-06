@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useReviewStore } from '../store/reviewStore'
-import type { ReviewComment } from '@shared/types'
+import type { ReviewComment, ReviewEventType } from '@shared/types'
 import './SubmitModal.css'
 
 interface SubmitModalProps {
@@ -14,6 +14,7 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
     () => comments.filter((c) => c.status === 'approved'),
     [comments]
   )
+  const [reviewType, setReviewType] = useState<ReviewEventType>('COMMENT')
   const [isSubmitting, setIsSubmittingLocal] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitResult, setSubmitResult] = useState<{
@@ -31,7 +32,7 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
 
     try {
       const prRef = `${prData.metadata.owner}/${prData.metadata.repo}#${prData.metadata.number}`
-      const result = await window.electronAPI.postComments(prRef, approvedComments)
+      const result = await window.electronAPI.postComments(prRef, approvedComments, reviewType)
 
       setSubmitResult(result)
 
@@ -105,6 +106,27 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
                   {prData?.metadata.owner}/{prData?.metadata.repo}#{prData?.metadata.number}
                 </strong>
               </p>
+
+              <div className="review-type-selector">
+                <div className="review-type-label">Review type</div>
+                <div className="review-type-options">
+                  {([
+                    { value: 'COMMENT', label: 'Comment', icon: '💬' },
+                    { value: 'APPROVE', label: 'Approve', icon: '✅' },
+                    { value: 'REQUEST_CHANGES', label: 'Request Changes', icon: '🔄' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      className={`review-type-option${reviewType === opt.value ? ' selected' : ''}`}
+                      onClick={() => setReviewType(opt.value)}
+                      type="button"
+                    >
+                      <span className="review-type-icon">{opt.icon}</span>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="submit-preview">
                 <div className="submit-preview-header">Comments to Submit</div>
