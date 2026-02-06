@@ -207,11 +207,15 @@ async function postCommentsIndividually(
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const results = { posted: 0, failed: [] as Array<{ file: string; line: number; error: string }> }
 
+  // Use the actual reviewType only on the first comment to avoid duplicate
+  // approval/request-changes events; subsequent comments are plain COMMENTs.
+  let usedEventType = false
+
   for (const comment of comments) {
-    // Create a single-comment review for each
+    const event = usedEventType ? 'COMMENT' : reviewType
     const payload = JSON.stringify({
       commit_id: commitSha,
-      event: reviewType,
+      event,
       comments: [{
         path: comment.file,
         line: comment.line,
@@ -230,6 +234,7 @@ async function postCommentsIndividually(
         '-',
       ], payload)
       results.posted++
+      usedEventType = true
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
       results.failed.push({

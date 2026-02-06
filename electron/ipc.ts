@@ -30,6 +30,10 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[], reviewType: ReviewEventType) => {
+    const validTypes: ReviewEventType[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES']
+    if (!validTypes.includes(reviewType)) {
+      throw new Error(`Invalid review type: ${reviewType}`)
+    }
     const commitSha = await getPRHeadSha(prRef)
     return postComments(prRef, comments, commitSha, reviewType)
   })
