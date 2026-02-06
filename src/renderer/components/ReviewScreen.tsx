@@ -14,8 +14,9 @@ interface ReviewScreenProps {
 }
 
 export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
-  const { prData, comments, selectedPersona, reset } = useReviewStore()
+  const { prData, comments, selectedPersona, reset, isAnalyzing, addComment } = useReviewStore()
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [commentingOnLine, setCommentingOnLine] = useState<{ file: string; line: number } | null>(null)
 
   const handleExit = useCallback(() => {
     reset()
@@ -51,6 +52,30 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
     setRefiningComment(comment)
   }
 
+  const handleLineClick = useCallback((file: string, line: number) => {
+    setCommentingOnLine({ file, line })
+  }, [])
+
+  const handleCommentSubmit = useCallback((message: string, severity: ReviewComment['severity']) => {
+    if (!commentingOnLine) return
+    const comment: ReviewComment = {
+      id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file: commentingOnLine.file,
+      line: commentingOnLine.line,
+      message,
+      severity,
+      status: 'approved',
+      originalMessage: message,
+      source: 'manual',
+    }
+    addComment(comment)
+    setCommentingOnLine(null)
+  }, [commentingOnLine, addComment])
+
+  const handleCommentCancel = useCallback(() => {
+    setCommentingOnLine(null)
+  }, [])
+
   if (!prData) {
     return <div className="review-screen">No PR data loaded</div>
   }
@@ -68,6 +93,12 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
               {selectedPersona?.name} • {comments.length} comments
             </span>
           </div>
+          {isAnalyzing && (
+            <div className="analysis-indicator">
+              <div className="analysis-indicator-spinner" />
+              <span>Analyzing...</span>
+            </div>
+          )}
         </div>
         <div className="review-toolbar-right">
           <button
@@ -118,6 +149,10 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
               diff={fileDiff}
               filename={selectedFile}
               comments={fileComments}
+              onLineClick={(line) => handleLineClick(selectedFile, line)}
+              commentingOnLine={commentingOnLine?.file === selectedFile ? commentingOnLine.line : null}
+              onCommentSubmit={handleCommentSubmit}
+              onCommentCancel={handleCommentCancel}
             />
           ) : (
             <div className="no-file-selected">

@@ -4,7 +4,6 @@ import { useInboxStore } from './store/inboxStore'
 import { InboxScreen } from './components/InboxScreen'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
-import { AnalysisProgress } from './components/AnalysisProgress'
 import { ReviewScreen } from './components/ReviewScreen'
 import type { InboxPR } from '@shared/types'
 import './styles/App.css'
@@ -104,18 +103,17 @@ export default function App() {
     setScreen(enteredFromRef.current)
   }, [setScreen])
 
+  const startAnalysisInBackground = useReviewStore((state) => state.startAnalysisInBackground)
+
   const handlePersonaNext = useCallback(() => {
-    setScreen('analyzing')
-  }, [setScreen])
-
-  const handleAnalysisComplete = useCallback(() => {
+    const { prData, selectedPersona } = useReviewStore.getState()
+    if (!prData || !selectedPersona) {
+      setError('Missing PR data or persona')
+      return
+    }
+    startAnalysisInBackground(prData.diff, selectedPersona.id)
     setScreen('review')
-  }, [setScreen])
-
-  const handleAnalysisError = useCallback(() => {
-    // Stay on persona select so user can try again
-    setScreen('persona-select')
-  }, [setScreen])
+  }, [setScreen, setError, startAnalysisInBackground])
 
   const handleReviewBack = useCallback(() => {
     setScreen('persona-select')
@@ -174,14 +172,6 @@ export default function App() {
       case 'persona-select':
         return (
           <PersonaSelect onNext={handlePersonaNext} onBack={handlePersonaBack} />
-        )
-
-      case 'analyzing':
-        return (
-          <AnalysisProgress
-            onComplete={handleAnalysisComplete}
-            onError={handleAnalysisError}
-          />
         )
 
       case 'review':

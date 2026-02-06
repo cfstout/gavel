@@ -27,15 +27,19 @@ interface ReviewState {
   // Comments
   comments: ReviewComment[]
   setComments: (comments: ReviewComment[]) => void
+  addComment: (comment: ReviewComment) => void
+  addComments: (comments: ReviewComment[]) => void
   updateCommentStatus: (commentId: string, status: CommentStatus) => void
   updateCommentMessage: (commentId: string, message: string) => void
 
   // Analysis state
   isAnalyzing: boolean
   analysisProgress: string
+  analysisGeneration: number
   setAnalyzing: (analyzing: boolean) => void
   setAnalysisProgress: (progress: string) => void
   appendAnalysisProgress: (chunk: string) => void
+  startAnalysisInBackground: (diff: string, personaId: string) => void
 
   // Submission state
   isSubmitting: boolean
@@ -59,13 +63,17 @@ const initialState = {
   prRef: '',
   prData: null,
   selectedPersona: null,
-  comments: [],
+  comments: [] as ReviewComment[],
   isAnalyzing: false,
   analysisProgress: '',
+  analysisGeneration: 0,
   isSubmitting: false,
   error: null,
   isRestored: false,
 }
+
+// Stored outside Zustand state so reset() can call it without it being part of the state shape
+let analysisCleanup: (() => void) | null = null
 
 export const useReviewStore = create<ReviewState>()(
   subscribeWithSelector((set, get) => ({
@@ -80,6 +88,12 @@ export const useReviewStore = create<ReviewState>()(
     setSelectedPersona: (selectedPersona) => set({ selectedPersona }),
 
     setComments: (comments) => set({ comments }),
+
+    addComment: (comment) =>
+      set((state) => ({ comments: [...state.comments, comment] })),
+
+    addComments: (comments) =>
+      set((state) => ({ comments: [...state.comments, ...comments] })),
 
     updateCommentStatus: (commentId, status) =>
       set((state) => ({
@@ -101,6 +115,37 @@ export const useReviewStore = create<ReviewState>()(
 
     appendAnalysisProgress: (chunk) =>
       set((state) => ({ analysisProgress: state.analysisProgress + chunk })),
+
+    startAnalysisInBackground: (diff, personaId) => {
+      // Clean up any previous listener before starting a new analysis
+      if (analysisCleanup) {
+        analysisCleanup()
+        analysisCleanup = null
+      }
+
+      const generation = get().analysisGeneration + 1
+      set({ isAnalyzing: true, analysisProgress: '', analysisGeneration: generation, error: null })
+
+      analysisCleanup = window.electronAPI.onAnalysisProgress((chunk) => {
+        if (get().analysisGeneration !== generation) return
+        get().appendAnalysisProgress(chunk)
+      })
+
+      window.electronAPI.analyzePR(diff, personaId)
+        .then((comments) => {
+          if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
+          if (get().analysisGeneration !== generation) return
+          const tagged = comments.map((c) => ({ ...c, source: 'claude' as const }))
+          get().addComments(tagged)
+          set({ isAnalyzing: false })
+        })
+        .catch((err) => {
+          if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
+          if (get().analysisGeneration !== generation) return
+          const message = err instanceof Error ? err.message : 'Analysis failed'
+          set({ isAnalyzing: false, error: message })
+        })
+    },
 
     setSubmitting: (isSubmitting) => set({ isSubmitting }),
 
@@ -149,7 +194,7 @@ export const useReviewStore = create<ReviewState>()(
     },
 
     reset: () => {
-      // Clear persisted state when resetting
+      if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
       window.electronAPI.clearState().catch(console.error)
       set(initialState)
     },

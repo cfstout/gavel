@@ -96,6 +96,7 @@ export interface ReviewComment {
   severity: 'suggestion' | 'warning' | 'critical'
   status: CommentStatus
   originalMessage: string // Keep original for comparison
+  source?: 'manual' | 'claude'
 }
 
 // Application state
