@@ -43,18 +43,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Event listeners for streaming
   onAnalysisProgress: (callback: (progress: string) => void) => {
-    ipcRenderer.on('claude:progress', (_event, progress) => callback(progress))
-    return () => ipcRenderer.removeAllListeners('claude:progress')
+    const handler = (_event: unknown, progress: string) => callback(progress)
+    ipcRenderer.on('claude:progress', handler)
+    return () => { ipcRenderer.removeListener('claude:progress', handler) }
   },
 
   // Inbox event listeners
   onInboxUpdate: (callback: (state: unknown) => void) => {
-    ipcRenderer.on('inbox:update', (_event, state) => callback(state))
-    return () => ipcRenderer.removeAllListeners('inbox:update')
+    const handler = (_event: unknown, state: unknown) => callback(state)
+    ipcRenderer.on('inbox:update', handler)
+    return () => { ipcRenderer.removeListener('inbox:update', handler) }
   },
 
   onPollError: (callback: (error: string) => void) => {
-    ipcRenderer.on('inbox:pollError', (_event, error) => callback(error))
-    return () => ipcRenderer.removeAllListeners('inbox:pollError')
+    const handler = (_event: unknown, error: string) => callback(error)
+    ipcRenderer.on('inbox:pollError', handler)
+    return () => { ipcRenderer.removeListener('inbox:pollError', handler) }
   },
 })

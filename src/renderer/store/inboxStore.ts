@@ -8,6 +8,7 @@ interface InboxStoreState {
   sources: PRSource[]
   lastPollAt: string | null
   pollIntervalMs: number
+  ignoredPRIds: Record<string, string>
   isLoading: boolean
   error: string | null
   isInitialized: boolean
@@ -28,6 +29,19 @@ interface InboxStoreState {
 }
 
 const DEFAULT_POLL_INTERVAL = 300000 // 5 minutes
+const cleanupFns: Array<() => void> = []
+
+/** Build an InboxState for persistence from current store state with overrides */
+function buildInboxState(store: InboxStoreState, overrides: Partial<InboxState> = {}): InboxState {
+  return {
+    prs: store.prs,
+    sources: store.sources,
+    lastPollAt: store.lastPollAt,
+    pollIntervalMs: store.pollIntervalMs,
+    ignoredPRIds: store.ignoredPRIds,
+    ...overrides,
+  }
+}
 
 export const useInboxStore = create<InboxStoreState>()(
   subscribeWithSelector((set, get) => ({
@@ -35,6 +49,7 @@ export const useInboxStore = create<InboxStoreState>()(
     sources: [],
     lastPollAt: null,
     pollIntervalMs: DEFAULT_POLL_INTERVAL,
+    ignoredPRIds: {},
     isLoading: false,
     error: null,
     isInitialized: false,
@@ -53,22 +68,33 @@ export const useInboxStore = create<InboxStoreState>()(
           sources: state.sources,
           lastPollAt: state.lastPollAt,
           pollIntervalMs: state.pollIntervalMs,
+          ignoredPRIds: state.ignoredPRIds ?? {},
           isInitialized: true,
           isLoading: false,
         })
 
-        // Set up event listeners for updates from polling
-        window.electronAPI.onInboxUpdate((inboxState: InboxState) => {
-          set({
-            prs: inboxState.prs,
-            sources: inboxState.sources,
-            lastPollAt: inboxState.lastPollAt,
-          })
-        })
+        // Clean up any previous listeners before registering new ones
+        if (cleanupFns.length > 0) {
+          cleanupFns.forEach((fn) => fn())
+          cleanupFns.length = 0
+        }
 
-        window.electronAPI.onPollError((error: string) => {
-          set({ error })
-        })
+        // Set up event listeners for updates from polling
+        cleanupFns.push(
+          window.electronAPI.onInboxUpdate((inboxState: InboxState) => {
+            set({
+              prs: inboxState.prs,
+              sources: inboxState.sources,
+              lastPollAt: inboxState.lastPollAt,
+            })
+          })
+        )
+
+        cleanupFns.push(
+          window.electronAPI.onPollError((error: string) => {
+            set({ error })
+          })
+        )
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load inbox'
         set({ error: message, isLoading: false, isInitialized: true })
@@ -90,15 +116,8 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     addSource: async (source) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
-      const newSources = [...sources, source]
-      const newState: InboxState = {
-        prs,
-        sources: newSources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newSources = [...get().sources, source]
+      const newState = buildInboxState(get(), { sources: newSources })
 
       try {
         await window.electronAPI.saveInboxState(newState)
@@ -113,16 +132,9 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     removeSource: async (sourceId) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
-      const newSources = sources.filter((s) => s.id !== sourceId)
-      const newPRs = prs.filter((pr) => pr.sourceId !== sourceId)
-      const newState: InboxState = {
-        prs: newPRs,
-        sources: newSources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newSources = get().sources.filter((s) => s.id !== sourceId)
+      const newPRs = get().prs.filter((pr) => pr.sourceId !== sourceId)
+      const newState = buildInboxState(get(), { prs: newPRs, sources: newSources })
 
       try {
         await window.electronAPI.saveInboxState(newState)
@@ -134,18 +146,10 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     updateSource: async (sourceId, updates) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
-      const newSources = sources.map((s) =>
+      const newSources = get().sources.map((s) =>
         s.id === sourceId ? { ...s, ...updates } : s
       ) as PRSource[]
-
-      const newState: InboxState = {
-        prs,
-        sources: newSources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newState = buildInboxState(get(), { sources: newSources })
 
       try {
         await window.electronAPI.saveInboxState(newState)
@@ -157,20 +161,13 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     addPR: async (pr) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
       // Deduplicate by ID — if it already exists, don't add again
-      if (prs.some((p) => p.id === pr.id)) {
+      if (get().prs.some((p) => p.id === pr.id)) {
         return
       }
 
-      const newPRs = [...prs, pr]
-      const newState: InboxState = {
-        prs: newPRs,
-        sources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newPRs = [...get().prs, pr]
+      const newState = buildInboxState(get(), { prs: newPRs })
 
       try {
         await window.electronAPI.saveInboxState(newState)
@@ -182,10 +179,8 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     movePR: async (prId, column) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
       const now = new Date().toISOString()
-      const newPRs = prs.map((pr) => {
+      const newPRs = get().prs.map((pr) => {
         if (pr.id !== prId) {
           return pr
         }
@@ -200,13 +195,7 @@ export const useInboxStore = create<InboxStoreState>()(
 
         return { ...pr, ...updates }
       })
-
-      const newState: InboxState = {
-        prs: newPRs,
-        sources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newState = buildInboxState(get(), { prs: newPRs })
 
       try {
         await window.electronAPI.saveInboxState(newState)
@@ -218,24 +207,14 @@ export const useInboxStore = create<InboxStoreState>()(
     },
 
     ignorePR: async (prId) => {
-      const { prs, sources, lastPollAt, pollIntervalMs } = get()
-
-      // Mark as ignored and filter out
       const now = new Date().toISOString()
-      const newPRs = prs
-        .map((pr) => (pr.id === prId ? { ...pr, ignoredAt: now } : pr))
-        .filter((pr) => pr.id !== prId)
-
-      const newState: InboxState = {
-        prs: newPRs,
-        sources,
-        lastPollAt,
-        pollIntervalMs,
-      }
+      const newPRs = get().prs.filter((pr) => pr.id !== prId)
+      const newIgnoredPRIds = { ...get().ignoredPRIds, [prId]: now }
+      const newState = buildInboxState(get(), { prs: newPRs, ignoredPRIds: newIgnoredPRIds })
 
       try {
         await window.electronAPI.saveInboxState(newState)
-        set({ prs: newPRs })
+        set({ prs: newPRs, ignoredPRIds: newIgnoredPRIds })
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to ignore PR'
         set({ error: message })

@@ -43,6 +43,7 @@ export interface InboxState {
   sources: PRSource[]
   lastPollAt: string | null
   pollIntervalMs: number // Default 300000 (5 min)
+  ignoredPRIds: Record<string, string> // prId -> ignoredAt ISO timestamp
 }
 
 // PR types
@@ -157,7 +158,7 @@ export interface ElectronAPI {
   // Inbox
   loadInboxState: () => Promise<InboxState>
   saveInboxState: (state: InboxState) => Promise<void>
-  fetchSlackPRs: (channelName: string, since?: string) => Promise<GitHubSearchPR[]>
+  fetchSlackPRs: (channelName: string, since?: string) => Promise<{ prs: GitHubSearchPR[]; error?: string }>
   // Slack token
   hasSlackToken: () => Promise<boolean>
   saveSlackToken: (token: string) => Promise<void>

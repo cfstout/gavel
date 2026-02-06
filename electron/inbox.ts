@@ -25,6 +25,7 @@ function getDefaultState(): InboxState {
     sources: [],
     lastPollAt: null,
     pollIntervalMs: DEFAULT_POLL_INTERVAL,
+    ignoredPRIds: {},
   }
 }
 
@@ -42,8 +43,14 @@ export async function loadInboxState(): Promise<InboxState> {
     const content = await readFile(inboxPath, 'utf-8')
     const state = JSON.parse(content) as InboxState
 
-    // Clean up old done items
+    // Backfill ignoredPRIds for older state files
+    if (!state.ignoredPRIds) {
+      state.ignoredPRIds = {}
+    }
+
+    // Clean up old done items and expired ignores
     state.prs = cleanupDonePRs(state.prs)
+    state.ignoredPRIds = cleanupExpiredIgnores(state.ignoredPRIds)
 
     return state
   } catch {
@@ -81,17 +88,34 @@ function cleanupDonePRs(prs: InboxPR[]): InboxPR[] {
 }
 
 /**
- * Check if a PR was ignored recently (within 7 days)
+ * Check if a PR ID was ignored recently (within 7 days)
  */
-export function isRecentlyIgnored(pr: InboxPR): boolean {
-  if (!pr.ignoredAt) {
+export function isRecentlyIgnored(prId: string, ignoredPRIds: Record<string, string>): boolean {
+  const ignoredAt = ignoredPRIds[prId]
+  if (!ignoredAt) {
     return false
   }
 
-  const ignoredTime = new Date(pr.ignoredAt).getTime()
+  const ignoredTime = new Date(ignoredAt).getTime()
   const cutoff = Date.now() - IGNORE_DURATION_DAYS * 24 * 60 * 60 * 1000
 
   return ignoredTime > cutoff
+}
+
+/**
+ * Remove expired ignores (older than 7 days)
+ */
+function cleanupExpiredIgnores(ignoredPRIds: Record<string, string>): Record<string, string> {
+  const cutoff = Date.now() - IGNORE_DURATION_DAYS * 24 * 60 * 60 * 1000
+  const cleaned: Record<string, string> = {}
+
+  for (const [prId, ignoredAt] of Object.entries(ignoredPRIds)) {
+    if (new Date(ignoredAt).getTime() > cutoff) {
+      cleaned[prId] = ignoredAt
+    }
+  }
+
+  return cleaned
 }
 
 /**
@@ -196,37 +220,14 @@ export function movePRToColumn(state: InboxState, prId: string, column: KanbanCo
 }
 
 /**
- * Mark a PR as ignored
+ * Mark a PR as ignored — removes from display and records in ignoredPRIds
  */
 export function ignorePR(state: InboxState, prId: string): InboxState {
   const now = new Date().toISOString()
 
   return {
     ...state,
-    prs: state.prs.filter((pr) => {
-      if (pr.id === prId) {
-        // Track the ignore time but remove from display
-        // The PR will be re-added on next poll but filtered out by isRecentlyIgnored
-        return false
-      }
-      return true
-    }),
-  }
-}
-
-/**
- * Track ignored PRs separately (so they don't reappear)
- */
-export function trackIgnoredPR(state: InboxState, prId: string): InboxState {
-  const pr = state.prs.find((p) => p.id === prId)
-  if (!pr) {
-    return state
-  }
-
-  return {
-    ...state,
-    prs: state.prs.map((p) =>
-      p.id === prId ? { ...p, ignoredAt: new Date().toISOString() } : p
-    ),
+    prs: state.prs.filter((pr) => pr.id !== prId),
+    ignoredPRIds: { ...state.ignoredPRIds, [prId]: now },
   }
 }

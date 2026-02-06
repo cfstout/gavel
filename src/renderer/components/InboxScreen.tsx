@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { InboxPR } from '@shared/types'
 import { useInboxStore } from '../store/inboxStore'
 import { KanbanColumn } from './KanbanColumn'
@@ -64,10 +64,10 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
   }
 
   // Filter PRs by column
-  const inboxPRs = prs.filter((pr) => pr.column === 'inbox')
-  const needsAttentionPRs = prs.filter((pr) => pr.column === 'needs-attention')
-  const reviewedPRs = prs.filter((pr) => pr.column === 'reviewed')
-  const donePRs = prs.filter((pr) => pr.column === 'done')
+  const inboxPRs = useMemo(() => prs.filter((pr) => pr.column === 'inbox'), [prs])
+  const needsAttentionPRs = useMemo(() => prs.filter((pr) => pr.column === 'needs-attention'), [prs])
+  const reviewedPRs = useMemo(() => prs.filter((pr) => pr.column === 'reviewed'), [prs])
+  const donePRs = useMemo(() => prs.filter((pr) => pr.column === 'done'), [prs])
 
   // Show loading state while initializing
   if (!isInitialized) {

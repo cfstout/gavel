@@ -1,4 +1,4 @@
-import { useCallback, useEffect, Component, ReactNode } from 'react'
+import { useCallback, useEffect, useRef, Component, ReactNode } from 'react'
 import { useReviewStore } from './store/reviewStore'
 import { useInboxStore } from './store/inboxStore'
 import { InboxScreen } from './components/InboxScreen'
@@ -58,11 +58,14 @@ class AppErrorBoundary extends Component<
 }
 
 export default function App() {
-  const { screen, setScreen, setPRRef, setPRData, error, setError, reset, isRestored, restoreState } = useReviewStore()
+  const { screen, setScreen, setPRRef, setPRData, prData, error, setError, reset, isRestored, restoreState } = useReviewStore()
   const { addPR, movePR } = useInboxStore()
 
   // Track the current PR being reviewed from inbox
   const currentInboxPRRef = useReviewStore((state) => state.prRef)
+
+  // Track how the user entered the review flow (inbox vs manual entry)
+  const enteredFromRef = useRef<'inbox' | 'pr-input'>('inbox')
 
   // Restore saved state on mount
   useEffect(() => {
@@ -75,10 +78,10 @@ export default function App() {
   const handleReviewFromInbox = useCallback(
     async (pr: InboxPR) => {
       try {
-        // Fetch full PR data
-        const prData = await window.electronAPI.fetchPR(pr.url)
+        enteredFromRef.current = 'inbox'
+        const fetchedPR = await window.electronAPI.fetchPR(pr.url)
         setPRRef(pr.url)
-        setPRData(prData)
+        setPRData(fetchedPR)
         setScreen('persona-select')
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fetch PR'
@@ -89,6 +92,7 @@ export default function App() {
   )
 
   const handleManualEntry = useCallback(() => {
+    enteredFromRef.current = 'pr-input'
     setScreen('pr-input')
   }, [setScreen])
 
@@ -97,8 +101,7 @@ export default function App() {
   }, [setScreen])
 
   const handlePersonaBack = useCallback(() => {
-    // Go back to inbox if we came from there, otherwise pr-input
-    setScreen('inbox')
+    setScreen(enteredFromRef.current)
   }, [setScreen])
 
   const handlePersonaNext = useCallback(() => {
@@ -124,7 +127,6 @@ export default function App() {
       if (match) {
         const [, owner, repo, number] = match
         const prId = `${owner}/${repo}#${number}`
-        const prData = useReviewStore.getState().prData
 
         // Ensure the PR exists in the inbox (handles manual entry)
         if (prData) {
@@ -137,7 +139,7 @@ export default function App() {
             title: prData.metadata.title,
             author: prData.metadata.author,
             url: currentInboxPRRef,
-            headSha: '', // Will be updated on next poll
+            headSha: '', // Will be backfilled on next poll (skips SHA comparison while empty)
             column: 'inbox',
             source: 'github-search',
             sourceId: 'manual',
@@ -154,7 +156,7 @@ export default function App() {
     // After successful submission, go back to inbox
     reset()
     setScreen('inbox')
-  }, [currentInboxPRRef, addPR, movePR, reset, setScreen])
+  }, [currentInboxPRRef, prData, addPR, movePR, reset, setScreen])
 
   const renderScreen = () => {
     switch (screen) {

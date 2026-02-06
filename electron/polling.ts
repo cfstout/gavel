@@ -1,5 +1,5 @@
 import { BrowserWindow } from 'electron'
-import type { InboxState, InboxPR, GitHubSearchPR, PRSource } from '../src/shared/types'
+import type { InboxState, InboxPR, GitHubSearchPR, PRSource, PRStatusResult } from '../src/shared/types'
 import {
   loadInboxState,
   saveInboxState,
@@ -12,8 +12,9 @@ import { fetchSlackPRs } from './slack'
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let isPolling = false
-let rateLimitBackoffMs = 0
+let rateLimitUntil = 0 // Timestamp (ms) until which we should back off
 const MAX_BACKOFF_MS = 30 * 60 * 1000 // 30 minutes
+const PR_STATUS_CONCURRENCY = 5
 
 /**
  * Get the main window for sending IPC events
@@ -92,18 +93,16 @@ async function runPoll(force: boolean): Promise<void> {
     return
   }
 
-  // Skip rate limit backoff only for automatic polls
-  if (!force && rateLimitBackoffMs > 0) {
-    rateLimitBackoffMs = Math.max(0, rateLimitBackoffMs - 60000)
-    if (rateLimitBackoffMs > 0) {
-      emitPollError(`Rate limited, retrying in ${Math.ceil(rateLimitBackoffMs / 60000)} minutes`)
-      return
-    }
+  // Skip if rate limited (unless manual refresh)
+  if (!force && rateLimitUntil > Date.now()) {
+    const remainingMs = rateLimitUntil - Date.now()
+    emitPollError(`Rate limited, retrying in ${Math.ceil(remainingMs / 60000)} minutes`)
+    return
   }
 
   // Reset rate limit on manual refresh
   if (force) {
-    rateLimitBackoffMs = 0
+    rateLimitUntil = 0
   }
 
   isPolling = true
@@ -160,7 +159,7 @@ async function pollSource(state: InboxState, source: PRSource): Promise<InboxSta
     // For Slack, only pass `since` if we already have PRs from this source.
     // On first poll of a new source, fetch without time filter to get existing PR links.
     const hasExistingPRs = state.prs.some((p) => p.sourceId === source.id)
-    const since = hasExistingPRs ? (state.lastPollAt || undefined) : undefined
+    const since = hasExistingPRs ? state.lastPollAt ?? undefined : undefined
 
     const result = await fetchSlackPRs(source.channelName, since)
     if (result.error) {
@@ -209,7 +208,7 @@ async function pollSource(state: InboxState, source: PRSource): Promise<InboxSta
         lastCheckedAt: new Date().toISOString(),
       }
 
-      if (!isRecentlyIgnored(tempPR)) {
+      if (!isRecentlyIgnored(prId, state.ignoredPRIds)) {
         // Add new PR to inbox
         state = {
           ...state,
@@ -224,46 +223,73 @@ async function pollSource(state: InboxState, source: PRSource): Promise<InboxSta
 
 /**
  * Check all PRs for status changes (new commits, merged, closed)
+ * Uses capped concurrency to avoid hammering the GitHub API.
  */
 async function checkPRStatusChanges(state: InboxState): Promise<InboxState> {
   // Only check PRs that aren't already done
   const activePRs = state.prs.filter((pr) => pr.column !== 'done')
 
-  for (const pr of activePRs) {
-    try {
-      const prRef = `${pr.owner}/${pr.repo}#${pr.number}`
-      const status = await getPRStatus(prRef)
+  // Fetch statuses in parallel with capped concurrency
+  type StatusResult = { pr: InboxPR; status: PRStatusResult } | { pr: InboxPR; error: unknown }
 
-      // Check if PR was merged or closed
-      if (status.state === 'merged' || status.state === 'closed') {
-        state = movePRToColumn(state, pr.id, 'done')
-        continue
+  const results: StatusResult[] = []
+  for (let i = 0; i < activePRs.length; i += PR_STATUS_CONCURRENCY) {
+    const batch = activePRs.slice(i, i + PR_STATUS_CONCURRENCY)
+    const batchResults = await Promise.allSettled(
+      batch.map(async (pr) => {
+        const prRef = `${pr.owner}/${pr.repo}#${pr.number}`
+        const status = await getPRStatus(prRef)
+        return { pr, status }
+      })
+    )
+
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value)
+      } else {
+        // Find which PR failed (order matches batch)
+        const idx = batchResults.indexOf(result)
+        results.push({ pr: batch[idx], error: result.reason })
       }
+    }
+  }
 
-      // Check if head SHA changed (new commits)
-      if (status.headSha !== pr.headSha) {
-        // If PR was in 'reviewed' column, move to 'needs-attention'
-        if (pr.column === 'reviewed') {
-          state = movePRToColumn(state, pr.id, 'needs-attention')
-        }
+  for (const result of results) {
+    if ('error' in result) {
+      console.warn(`Failed to check PR status for ${result.pr.id}:`, result.error)
+      continue
+    }
 
-        // Update the head SHA
-        state = {
-          ...state,
-          prs: state.prs.map((p) =>
-            p.id === pr.id
-              ? {
-                  ...p,
-                  headSha: status.headSha,
-                  lastCheckedAt: new Date().toISOString(),
-                }
-              : p
-          ),
-        }
+    const { pr, status } = result
+
+    // Check if PR was merged or closed
+    if (status.state === 'merged' || status.state === 'closed') {
+      state = movePRToColumn(state, pr.id, 'done')
+      continue
+    }
+
+    // Check if head SHA changed (new commits)
+    // Skip comparison when headSha is empty (e.g. just-reviewed manual PRs)
+    if (pr.headSha && status.headSha !== pr.headSha) {
+      if (pr.column === 'reviewed') {
+        state = movePRToColumn(state, pr.id, 'needs-attention')
       }
-    } catch (err) {
-      // Skip PRs we can't check (deleted, inaccessible)
-      console.warn(`Failed to check PR status for ${pr.id}:`, err)
+    }
+
+    // Always update to the latest SHA
+    if (status.headSha !== pr.headSha) {
+      state = {
+        ...state,
+        prs: state.prs.map((p) =>
+          p.id === pr.id
+            ? {
+                ...p,
+                headSha: status.headSha,
+                lastCheckedAt: new Date().toISOString(),
+              }
+            : p
+        ),
+      }
     }
   }
 
@@ -278,9 +304,11 @@ function handlePollError(err: unknown, source: PRSource): void {
 
   // Check for rate limiting
   if (message.includes('403') || message.includes('429') || message.includes('rate limit')) {
-    // Exponential backoff
-    rateLimitBackoffMs = Math.min(rateLimitBackoffMs * 2 || 60000, MAX_BACKOFF_MS)
-    emitPollError(`Rate limited while polling ${source.name}. Backing off for ${Math.ceil(rateLimitBackoffMs / 60000)} minutes.`)
+    // Exponential backoff — double the remaining backoff or start at 1 minute
+    const currentBackoff = Math.max(rateLimitUntil - Date.now(), 0)
+    const nextBackoff = Math.min((currentBackoff * 2) || 60000, MAX_BACKOFF_MS)
+    rateLimitUntil = Date.now() + nextBackoff
+    emitPollError(`Rate limited while polling ${source.name}. Backing off for ${Math.ceil(nextBackoff / 60000)} minutes.`)
   } else {
     emitPollError(`Error polling ${source.name}: ${message}`)
   }
