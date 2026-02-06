@@ -148,7 +148,7 @@ export interface ElectronAPI {
   checkGitHubAuth: () => Promise<boolean>
   fetchPR: (prUrl: string) => Promise<PRData>
   fetchPRBody: (prRef: string) => Promise<string>
-  postComments: (prUrl: string, comments: ReviewComment[], reviewType: ReviewEventType) => Promise<PostCommentsResult>
+  postComments: (prUrl: string, comments: ReviewComment[], reviewType: ReviewEventType, reviewBody?: string) => Promise<PostCommentsResult>
   searchPRs: (query: string) => Promise<GitHubSearchPR[]>
   getPRStatus: (prRef: string) => Promise<PRStatusResult>
   // Claude

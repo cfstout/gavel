@@ -7,8 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkGitHubAuth: () => ipcRenderer.invoke('github:checkAuth'),
   fetchPR: (prUrl: string) => ipcRenderer.invoke('github:fetchPR', prUrl),
   fetchPRBody: (prRef: string) => ipcRenderer.invoke('github:fetchPRBody', prRef),
-  postComments: (prUrl: string, comments: unknown[], reviewType: string) =>
-    ipcRenderer.invoke('github:postComments', prUrl, comments, reviewType),
+  postComments: (prUrl: string, comments: unknown[], reviewType: string, reviewBody?: string) =>
+    ipcRenderer.invoke('github:postComments', prUrl, comments, reviewType, reviewBody),
   searchPRs: (query: string) => ipcRenderer.invoke('github:searchPRs', query),
   getPRStatus: (prRef: string) => ipcRenderer.invoke('github:getPRStatus', prRef),
 

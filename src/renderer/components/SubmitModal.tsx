@@ -15,6 +15,7 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
     [comments]
   )
   const [reviewType, setReviewType] = useState<ReviewEventType>('COMMENT')
+  const [reviewBody, setReviewBody] = useState('')
   const [isSubmitting, setIsSubmittingLocal] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitResult, setSubmitResult] = useState<{
@@ -22,8 +23,15 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
     failed: Array<{ file: string; line: number; error: string }>
   } | null>(null)
 
+  const hasBody = reviewBody.trim().length > 0
+  const hasComments = approvedComments.length > 0
+  const canSubmit =
+    reviewType === 'APPROVE'
+      ? true // Approve is always valid
+      : hasComments || hasBody // Comment/Request Changes need at least one
+
   const handleSubmit = async () => {
-    if (!prData || approvedComments.length === 0) return
+    if (!prData || !canSubmit) return
 
     setIsSubmittingLocal(true)
     setSubmitting(true)
@@ -32,19 +40,17 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
 
     try {
       const prRef = `${prData.metadata.owner}/${prData.metadata.repo}#${prData.metadata.number}`
-      const result = await window.electronAPI.postComments(prRef, approvedComments, reviewType)
+      const body = reviewBody.trim() || undefined
+      const result = await window.electronAPI.postComments(prRef, approvedComments, reviewType, body)
 
       setSubmitResult(result)
 
-      // If all or some succeeded, consider it a success
-      if (result.posted > 0) {
-        if (result.failed.length === 0) {
-          // Full success - close and reset
-          onSuccess()
-          reset()
-        }
-        // Partial success - stay open to show results
+      // If all comments succeeded (or there were none), it's a full success
+      if (result.failed.length === 0) {
+        onSuccess()
+        reset()
       }
+      // Partial success - stay open to show results
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to submit comments'
       setSubmitError(message)
@@ -99,12 +105,13 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
             // Show preview before submission
             <>
               <p className="submit-summary">
-                You are about to submit{' '}
-                <strong>{approvedComments.length} comment{approvedComments.length !== 1 ? 's' : ''}</strong>{' '}
-                to{' '}
+                Submitting review to{' '}
                 <strong>
                   {prData?.metadata.owner}/{prData?.metadata.repo}#{prData?.metadata.number}
                 </strong>
+                {hasComments && (
+                  <> with <strong>{approvedComments.length} inline comment{approvedComments.length !== 1 ? 's' : ''}</strong></>
+                )}
               </p>
 
               <div className="review-type-selector">
@@ -128,14 +135,27 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
                 </div>
               </div>
 
-              <div className="submit-preview">
-                <div className="submit-preview-header">Comments to Submit</div>
-                <div className="submit-preview-list">
-                  {approvedComments.map((comment) => (
-                    <CommentPreview key={comment.id} comment={comment} />
-                  ))}
-                </div>
+              <div className="review-body-field">
+                <div className="review-body-label">Review body</div>
+                <textarea
+                  className="review-body-textarea"
+                  placeholder="Optional summary for the review..."
+                  value={reviewBody}
+                  onChange={(e) => setReviewBody(e.target.value)}
+                  rows={3}
+                />
               </div>
+
+              {hasComments && (
+                <div className="submit-preview">
+                  <div className="submit-preview-header">Comments to Submit</div>
+                  <div className="submit-preview-list">
+                    {approvedComments.map((comment) => (
+                      <CommentPreview key={comment.id} comment={comment} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -157,7 +177,7 @@ export function SubmitModal({ onClose, onSuccess }: SubmitModalProps) {
               <button
                 className="primary"
                 onClick={handleSubmit}
-                disabled={isSubmitting || approvedComments.length === 0}
+                disabled={isSubmitting || !canSubmit}
               >
                 {isSubmitting ? 'Submitting...' : 'Submit to GitHub'}
               </button>

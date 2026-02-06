@@ -85,9 +85,8 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
           <button
             className="primary"
             onClick={() => setShowSubmitModal(true)}
-            disabled={approvedComments.length === 0}
           >
-            Submit {approvedComments.length > 0 && `(${approvedComments.length})`}
+            Submit Review{approvedComments.length > 0 ? ` (${approvedComments.length})` : ''}
           </button>
         </div>
       </div>

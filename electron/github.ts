@@ -149,7 +149,8 @@ export async function postComments(
   prRef: string,
   comments: ReviewComment[],
   commitSha: string,
-  reviewType: ReviewEventType = 'COMMENT'
+  reviewType: ReviewEventType = 'COMMENT',
+  body?: string
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const { owner, repo, number } = parsePRReference(prRef)
 
@@ -162,11 +163,15 @@ export async function postComments(
   }))
 
   // Create the review JSON payload
-  const payload = JSON.stringify({
+  const reviewPayload: Record<string, unknown> = {
     commit_id: commitSha,
     event: reviewType,
     comments: reviewComments,
-  })
+  }
+  if (body) {
+    reviewPayload.body = body
+  }
+  const payload = JSON.stringify(reviewPayload)
 
   try {
     await execGh([
@@ -187,7 +192,7 @@ export async function postComments(
     if (errorMsg.includes('Validation Failed')) {
       // If the batch fails, try posting comments individually as a fallback
       // This helps identify which specific comments are problematic
-      return await postCommentsIndividually(owner, repo, number, comments, commitSha, reviewType)
+      return await postCommentsIndividually(owner, repo, number, comments, commitSha, reviewType, body)
     }
 
     throw new Error(`Failed to create review: ${errorMsg}`)
@@ -203,7 +208,8 @@ async function postCommentsIndividually(
   number: number,
   comments: ReviewComment[],
   commitSha: string,
-  reviewType: ReviewEventType = 'COMMENT'
+  reviewType: ReviewEventType = 'COMMENT',
+  body?: string
 ): Promise<{ posted: number; failed: Array<{ file: string; line: number; error: string }> }> {
   const results = { posted: 0, failed: [] as Array<{ file: string; line: number; error: string }> }
 
@@ -213,7 +219,7 @@ async function postCommentsIndividually(
 
   for (const comment of comments) {
     const event = usedEventType ? 'COMMENT' : reviewType
-    const payload = JSON.stringify({
+    const reviewPayload: Record<string, unknown> = {
       commit_id: commitSha,
       event,
       comments: [{
@@ -222,7 +228,12 @@ async function postCommentsIndividually(
         side: 'RIGHT',
         body: formatCommentBody(comment),
       }],
-    })
+    }
+    // Attach body only to the first review submission
+    if (!usedEventType && body) {
+      reviewPayload.body = body
+    }
+    const payload = JSON.stringify(reviewPayload)
 
     try {
       await execGh([

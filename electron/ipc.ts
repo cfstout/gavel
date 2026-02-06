@@ -29,13 +29,13 @@ export function registerIpcHandlers(): void {
     return fetchPRBody(prRef)
   })
 
-  ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[], reviewType: ReviewEventType) => {
+  ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[], reviewType: ReviewEventType, reviewBody?: string) => {
     const validTypes: ReviewEventType[] = ['COMMENT', 'APPROVE', 'REQUEST_CHANGES']
     if (!validTypes.includes(reviewType)) {
       throw new Error(`Invalid review type: ${reviewType}`)
     }
     const commitSha = await getPRHeadSha(prRef)
-    return postComments(prRef, comments, commitSha, reviewType)
+    return postComments(prRef, comments, commitSha, reviewType, reviewBody)
   })
 
   // Claude handlers
