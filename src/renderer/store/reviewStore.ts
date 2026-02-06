@@ -27,15 +27,19 @@ interface ReviewState {
   // Comments
   comments: ReviewComment[]
   setComments: (comments: ReviewComment[]) => void
+  addComment: (comment: ReviewComment) => void
+  addComments: (comments: ReviewComment[]) => void
   updateCommentStatus: (commentId: string, status: CommentStatus) => void
   updateCommentMessage: (commentId: string, message: string) => void
 
   // Analysis state
   isAnalyzing: boolean
   analysisProgress: string
+  analysisGeneration: number
   setAnalyzing: (analyzing: boolean) => void
   setAnalysisProgress: (progress: string) => void
   appendAnalysisProgress: (chunk: string) => void
+  startAnalysisInBackground: (diff: string, personaId: string) => void
 
   // Submission state
   isSubmitting: boolean
@@ -59,9 +63,10 @@ const initialState = {
   prRef: '',
   prData: null,
   selectedPersona: null,
-  comments: [],
+  comments: [] as ReviewComment[],
   isAnalyzing: false,
   analysisProgress: '',
+  analysisGeneration: 0,
   isSubmitting: false,
   error: null,
   isRestored: false,
@@ -80,6 +85,12 @@ export const useReviewStore = create<ReviewState>()(
     setSelectedPersona: (selectedPersona) => set({ selectedPersona }),
 
     setComments: (comments) => set({ comments }),
+
+    addComment: (comment) =>
+      set((state) => ({ comments: [...state.comments, comment] })),
+
+    addComments: (comments) =>
+      set((state) => ({ comments: [...state.comments, ...comments] })),
 
     updateCommentStatus: (commentId, status) =>
       set((state) => ({
@@ -101,6 +112,31 @@ export const useReviewStore = create<ReviewState>()(
 
     appendAnalysisProgress: (chunk) =>
       set((state) => ({ analysisProgress: state.analysisProgress + chunk })),
+
+    startAnalysisInBackground: (diff, personaId) => {
+      const generation = get().analysisGeneration + 1
+      set({ isAnalyzing: true, analysisProgress: '', analysisGeneration: generation, error: null })
+
+      const cleanup = window.electronAPI.onAnalysisProgress((chunk) => {
+        if (get().analysisGeneration !== generation) return
+        get().appendAnalysisProgress(chunk)
+      })
+
+      window.electronAPI.analyzePR(diff, personaId)
+        .then((comments) => {
+          cleanup()
+          if (get().analysisGeneration !== generation) return
+          const tagged = comments.map((c) => ({ ...c, source: 'claude' as const }))
+          get().addComments(tagged)
+          set({ isAnalyzing: false })
+        })
+        .catch((err) => {
+          cleanup()
+          if (get().analysisGeneration !== generation) return
+          const message = err instanceof Error ? err.message : 'Analysis failed'
+          set({ isAnalyzing: false, error: message })
+        })
+    },
 
     setSubmitting: (isSubmitting) => set({ isSubmitting }),
 

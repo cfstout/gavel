@@ -1,4 +1,4 @@
-import { useMemo, Component, ReactNode } from 'react'
+import { useMemo, useState, useCallback, Component, ReactNode } from 'react'
 import { Diff, Hunk, parseDiff } from 'react-diff-view'
 import type { ReviewComment } from '@shared/types'
 import 'react-diff-view/style/index.css'
@@ -47,6 +47,10 @@ interface DiffViewerProps {
   diff: string
   filename: string
   comments: ReviewComment[]
+  onLineClick?: (line: number) => void
+  commentingOnLine?: number | null
+  onCommentSubmit?: (message: string, severity: ReviewComment['severity']) => void
+  onCommentCancel?: () => void
 }
 
 // Type for react-diff-view change objects
@@ -71,7 +75,7 @@ interface DiffHunk {
   changes: DiffChange[]
 }
 
-export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
+export function DiffViewer({ diff, filename, comments, onLineClick, commentingOnLine, onCommentSubmit, onCommentCancel }: DiffViewerProps) {
   const { files, parseError } = useMemo(() => {
     if (!diff) return { files: [], parseError: null }
     try {
@@ -103,31 +107,63 @@ export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
     return map
   }, [file?.hunks])
 
-  // Create widgets for comments, keyed by change key
+  // Handle gutter clicks to add manual comments
+  const handleGutterClick = useCallback((change: DiffChange) => {
+    if (!onLineClick) return
+    // Only allow commenting on insert and normal lines (which have a new line number)
+    if (change.type === 'delete') return
+    const line = change.newLineNumber ?? change.lineNumber
+    if (line !== undefined) {
+      onLineClick(line)
+    }
+  }, [onLineClick])
+
+  // Create widgets for comments + comment form, keyed by change key
   const widgets = useMemo(() => {
     const result: Record<string, React.ReactElement> = {}
 
     for (const comment of comments) {
       const changeKey = lineToChangeKey.get(comment.line)
       if (changeKey) {
+        // If multiple comments on same line, we'd need an array — for now last wins
+        // but since both Claude and manual comments append, we show both via stacking
+        const existing = result[changeKey]
         result[changeKey] = (
-          <div
-            key={comment.id}
-            className={`diff-inline-comment severity-${comment.severity}`}
-          >
-            <div className="inline-comment-marker">
-              <span className="comment-severity">{getSeverityIcon(comment.severity)}</span>
-              <span className="comment-label">{comment.severity}</span>
-            </div>
-            <div className="inline-comment-body">
-              <div className="inline-comment-message">{comment.message}</div>
+          <div key={`widgets-${comment.line}`}>
+            {existing}
+            <div
+              className={`diff-inline-comment severity-${comment.severity}${comment.source === 'manual' ? ' source-manual' : ''}`}
+            >
+              <div className="inline-comment-marker">
+                <span className="comment-severity">{getSeverityIcon(comment.severity)}</span>
+                <span className="comment-label">{comment.severity}</span>
+                {comment.source === 'manual' && <span className="comment-source-badge">manual</span>}
+              </div>
+              <div className="inline-comment-body">
+                <div className="inline-comment-message">{comment.message}</div>
+              </div>
             </div>
           </div>
         )
       }
     }
+
+    // Add comment form widget if user is commenting on a line
+    if (commentingOnLine != null && onCommentSubmit && onCommentCancel) {
+      const changeKey = lineToChangeKey.get(commentingOnLine)
+      if (changeKey) {
+        const existing = result[changeKey]
+        result[changeKey] = (
+          <div key={`widgets-form-${commentingOnLine}`}>
+            {existing}
+            <CommentForm onSubmit={onCommentSubmit} onCancel={onCommentCancel} />
+          </div>
+        )
+      }
+    }
+
     return result
-  }, [comments, lineToChangeKey])
+  }, [comments, lineToChangeKey, commentingOnLine, onCommentSubmit, onCommentCancel])
 
   if (parseError) {
     return (
@@ -164,12 +200,13 @@ export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
             <span className="diff-comment-count">{comments.length} comment{comments.length !== 1 ? 's' : ''}</span>
           )}
         </div>
-        <div className="diff-content">
+        <div className={`diff-content${onLineClick ? ' gutter-clickable' : ''}`}>
           <Diff
             viewType="unified"
             diffType={file.type}
             hunks={file.hunks}
             widgets={widgets}
+            gutterEvents={{ onClick: ({ change }: { change: DiffChange | null }) => { if (change) handleGutterClick(change) } }}
           >
             {(hunks) =>
               hunks.map((hunk) => (
@@ -180,6 +217,60 @@ export function DiffViewer({ diff, filename, comments }: DiffViewerProps) {
         </div>
       </div>
     </DiffErrorBoundary>
+  )
+}
+
+function CommentForm({ onSubmit, onCancel }: {
+  onSubmit: (message: string, severity: ReviewComment['severity']) => void
+  onCancel: () => void
+}) {
+  const [message, setMessage] = useState('')
+  const [severity, setSeverity] = useState<ReviewComment['severity']>('suggestion')
+
+  const handleSubmit = useCallback(() => {
+    const trimmed = message.trim()
+    if (!trimmed) return
+    onSubmit(trimmed, severity)
+  }, [message, severity, onSubmit])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      handleSubmit()
+    } else if (e.key === 'Escape') {
+      onCancel()
+    }
+  }, [handleSubmit, onCancel])
+
+  return (
+    <div className="comment-form-widget">
+      <textarea
+        className="comment-form-textarea"
+        placeholder="Add a comment..."
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={handleKeyDown}
+        autoFocus
+        rows={3}
+      />
+      <div className="comment-form-actions">
+        <select
+          className="comment-form-severity"
+          value={severity}
+          onChange={(e) => setSeverity(e.target.value as ReviewComment['severity'])}
+        >
+          <option value="suggestion">Suggestion</option>
+          <option value="warning">Warning</option>
+          <option value="critical">Critical</option>
+        </select>
+        <div className="comment-form-buttons">
+          <button className="comment-form-cancel" onClick={onCancel}>Cancel</button>
+          <button className="comment-form-submit primary" onClick={handleSubmit} disabled={!message.trim()}>
+            Comment
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

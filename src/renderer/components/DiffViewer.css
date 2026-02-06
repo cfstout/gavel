@@ -186,6 +186,122 @@
   white-space: pre-wrap;
 }
 
+/* Gutter click interaction */
+.gutter-clickable .diff-gutter:not(.diff-gutter-delete) {
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+
+.gutter-clickable .diff-gutter:not(.diff-gutter-delete):hover {
+  background-color: rgba(88, 166, 255, 0.15);
+}
+
+.gutter-clickable .diff-gutter:not(.diff-gutter-delete):hover::after {
+  content: '+';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-blue);
+  line-height: 1;
+}
+
+/* Manual comment source badge */
+.comment-source-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background-color: rgba(88, 166, 255, 0.2);
+  color: var(--color-accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Inline comment form */
+.comment-form-widget {
+  padding: 12px 16px;
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-accent-blue);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.comment-form-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.comment-form-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-blue);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.comment-form-textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.comment-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.comment-form-severity {
+  padding: 4px 8px;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.comment-form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-form-cancel {
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.comment-form-cancel:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+.comment-form-submit {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.comment-form-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Syntax highlighting tokens */
 .diff-viewer .token.comment { color: #8b949e; }
 .diff-viewer .token.string { color: #a5d6ff; }
