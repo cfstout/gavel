@@ -1,9 +1,12 @@
-import { useCallback, useEffect, Component, ReactNode } from 'react'
+import { useCallback, useEffect, useRef, Component, ReactNode } from 'react'
 import { useReviewStore } from './store/reviewStore'
+import { useInboxStore } from './store/inboxStore'
+import { InboxScreen } from './components/InboxScreen'
 import { PRInput } from './components/PRInput'
 import { PersonaSelect } from './components/PersonaSelect'
 import { AnalysisProgress } from './components/AnalysisProgress'
 import { ReviewScreen } from './components/ReviewScreen'
+import type { InboxPR } from '@shared/types'
 import './styles/App.css'
 
 // Top-level error boundary to catch React crashes
@@ -55,7 +58,14 @@ class AppErrorBoundary extends Component<
 }
 
 export default function App() {
-  const { screen, setScreen, error, setError, reset, isRestored, restoreState } = useReviewStore()
+  const { screen, setScreen, setPRRef, setPRData, prData, error, setError, reset, isRestored, restoreState } = useReviewStore()
+  const { addPR, movePR } = useInboxStore()
+
+  // Track the current PR being reviewed from inbox
+  const currentInboxPRRef = useReviewStore((state) => state.prRef)
+
+  // Track how the user entered the review flow (inbox vs manual entry)
+  const enteredFromRef = useRef<'inbox' | 'pr-input'>('inbox')
 
   // Restore saved state on mount
   useEffect(() => {
@@ -64,12 +74,34 @@ export default function App() {
     }
   }, [isRestored, restoreState])
 
+  // Handle starting a review from the inbox
+  const handleReviewFromInbox = useCallback(
+    async (pr: InboxPR) => {
+      try {
+        enteredFromRef.current = 'inbox'
+        const fetchedPR = await window.electronAPI.fetchPR(pr.url)
+        setPRRef(pr.url)
+        setPRData(fetchedPR)
+        setScreen('persona-select')
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch PR'
+        setError(message)
+      }
+    },
+    [setPRRef, setPRData, setScreen, setError]
+  )
+
+  const handleManualEntry = useCallback(() => {
+    enteredFromRef.current = 'pr-input'
+    setScreen('pr-input')
+  }, [setScreen])
+
   const handlePRInputNext = useCallback(() => {
     setScreen('persona-select')
   }, [setScreen])
 
   const handlePersonaBack = useCallback(() => {
-    setScreen('pr-input')
+    setScreen(enteredFromRef.current)
   }, [setScreen])
 
   const handlePersonaNext = useCallback(() => {
@@ -89,13 +121,53 @@ export default function App() {
     setScreen('persona-select')
   }, [setScreen])
 
-  const handleReviewSubmitSuccess = useCallback(() => {
-    // After successful submission, go back to PR input for next review
-    setScreen('pr-input')
-  }, [setScreen])
+  const handleReviewSubmitSuccess = useCallback(async () => {
+    if (currentInboxPRRef) {
+      const match = currentInboxPRRef.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
+      if (match) {
+        const [, owner, repo, number] = match
+        const prId = `${owner}/${repo}#${number}`
+
+        // Ensure the PR exists in the inbox (handles manual entry)
+        if (prData) {
+          const now = new Date().toISOString()
+          await addPR({
+            id: prId,
+            owner,
+            repo,
+            number: parseInt(number, 10),
+            title: prData.metadata.title,
+            author: prData.metadata.author,
+            url: currentInboxPRRef,
+            headSha: '', // Will be backfilled on next poll (skips SHA comparison while empty)
+            column: 'inbox',
+            source: 'github-search',
+            sourceId: 'manual',
+            addedAt: now,
+            lastCheckedAt: now,
+          })
+        }
+
+        // Move to reviewed
+        await movePR(prId, 'reviewed')
+      }
+    }
+
+    // After successful submission, go back to inbox
+    reset()
+    setScreen('inbox')
+  }, [currentInboxPRRef, prData, addPR, movePR, reset, setScreen])
 
   const renderScreen = () => {
     switch (screen) {
+      case 'inbox':
+        return (
+          <InboxScreen
+            onReviewPR={handleReviewFromInbox}
+            onManualEntry={handleManualEntry}
+          />
+        )
+
       case 'pr-input':
         return <PRInput onNext={handlePRInputNext} />
 
