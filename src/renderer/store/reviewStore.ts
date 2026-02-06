@@ -72,6 +72,9 @@ const initialState = {
   isRestored: false,
 }
 
+// Stored outside Zustand state so reset() can call it without it being part of the state shape
+let analysisCleanup: (() => void) | null = null
+
 export const useReviewStore = create<ReviewState>()(
   subscribeWithSelector((set, get) => ({
     ...initialState,
@@ -114,24 +117,30 @@ export const useReviewStore = create<ReviewState>()(
       set((state) => ({ analysisProgress: state.analysisProgress + chunk })),
 
     startAnalysisInBackground: (diff, personaId) => {
+      // Clean up any previous listener before starting a new analysis
+      if (analysisCleanup) {
+        analysisCleanup()
+        analysisCleanup = null
+      }
+
       const generation = get().analysisGeneration + 1
       set({ isAnalyzing: true, analysisProgress: '', analysisGeneration: generation, error: null })
 
-      const cleanup = window.electronAPI.onAnalysisProgress((chunk) => {
+      analysisCleanup = window.electronAPI.onAnalysisProgress((chunk) => {
         if (get().analysisGeneration !== generation) return
         get().appendAnalysisProgress(chunk)
       })
 
       window.electronAPI.analyzePR(diff, personaId)
         .then((comments) => {
-          cleanup()
+          if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
           if (get().analysisGeneration !== generation) return
           const tagged = comments.map((c) => ({ ...c, source: 'claude' as const }))
           get().addComments(tagged)
           set({ isAnalyzing: false })
         })
         .catch((err) => {
-          cleanup()
+          if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
           if (get().analysisGeneration !== generation) return
           const message = err instanceof Error ? err.message : 'Analysis failed'
           set({ isAnalyzing: false, error: message })
@@ -185,7 +194,7 @@ export const useReviewStore = create<ReviewState>()(
     },
 
     reset: () => {
-      // Clear persisted state when resetting
+      if (analysisCleanup) { analysisCleanup(); analysisCleanup = null }
       window.electronAPI.clearState().catch(console.error)
       set(initialState)
     },

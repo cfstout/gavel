@@ -106,13 +106,14 @@ export default function App() {
   const startAnalysisInBackground = useReviewStore((state) => state.startAnalysisInBackground)
 
   const handlePersonaNext = useCallback(() => {
-    const { prData } = useReviewStore.getState()
-    const { selectedPersona } = useReviewStore.getState()
-    if (prData && selectedPersona) {
-      startAnalysisInBackground(prData.diff, selectedPersona.id)
+    const { prData, selectedPersona } = useReviewStore.getState()
+    if (!prData || !selectedPersona) {
+      setError('Missing PR data or persona')
+      return
     }
+    startAnalysisInBackground(prData.diff, selectedPersona.id)
     setScreen('review')
-  }, [setScreen, startAnalysisInBackground])
+  }, [setScreen, setError, startAnalysisInBackground])
 
   const handleReviewBack = useCallback(() => {
     setScreen('persona-select')

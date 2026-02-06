@@ -110,9 +110,8 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
   // Handle gutter clicks to add manual comments
   const handleGutterClick = useCallback((change: DiffChange) => {
     if (!onLineClick) return
-    // Only allow commenting on insert and normal lines (which have a new line number)
     if (change.type === 'delete') return
-    const line = change.newLineNumber ?? change.lineNumber
+    const line = change.newLineNumber
     if (line !== undefined) {
       onLineClick(line)
     }
@@ -125,11 +124,9 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
     for (const comment of comments) {
       const changeKey = lineToChangeKey.get(comment.line)
       if (changeKey) {
-        // If multiple comments on same line, we'd need an array — for now last wins
-        // but since both Claude and manual comments append, we show both via stacking
         const existing = result[changeKey]
         result[changeKey] = (
-          <div key={`widgets-${comment.line}`}>
+          <div key={`widgets-${comment.id}`}>
             {existing}
             <div
               className={`diff-inline-comment severity-${comment.severity}${comment.source === 'manual' ? ' source-manual' : ''}`}
