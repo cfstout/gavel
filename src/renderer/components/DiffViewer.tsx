@@ -132,12 +132,9 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
               className={`diff-inline-comment severity-${comment.severity}${comment.source === 'manual' ? ' source-manual' : ''}`}
             >
               <div className="inline-comment-marker">
-                <span className="comment-severity">{getSeverityIcon(comment.severity)}</span>
-                <span className="comment-label">{comment.severity}</span>
+                <span className="comment-label">{comment.severity}:</span>
+                <span className="inline-comment-message">{comment.message}</span>
                 {comment.source === 'manual' && <span className="comment-source-badge">manual</span>}
-              </div>
-              <div className="inline-comment-body">
-                <div className="inline-comment-message">{comment.message}</div>
               </div>
             </div>
           </div>
@@ -271,15 +268,3 @@ function CommentForm({ onSubmit, onCancel }: {
   )
 }
 
-function getSeverityIcon(severity: ReviewComment['severity']): string {
-  switch (severity) {
-    case 'critical':
-      return '🚨'
-    case 'warning':
-      return '⚠️'
-    case 'suggestion':
-      return '💡'
-    default:
-      return '💬'
-  }
-}
