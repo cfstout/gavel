@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // GitHub operations
   checkGitHubAuth: () => ipcRenderer.invoke('github:checkAuth'),
   fetchPR: (prUrl: string) => ipcRenderer.invoke('github:fetchPR', prUrl),
+  fetchPRBody: (prRef: string) => ipcRenderer.invoke('github:fetchPRBody', prRef),
   postComments: (prUrl: string, comments: unknown[]) =>
     ipcRenderer.invoke('github:postComments', prUrl, comments),
   searchPRs: (query: string) => ipcRenderer.invoke('github:searchPRs', query),

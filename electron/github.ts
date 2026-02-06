@@ -281,6 +281,26 @@ function formatCommentBody(comment: ReviewComment): string {
 }
 
 /**
+ * Fetch just the PR body/description (lightweight call for previews)
+ */
+export async function fetchPRBody(prRef: string): Promise<string> {
+  const { owner, repo, number } = parsePRReference(prRef)
+
+  const result = await execGh([
+    'pr',
+    'view',
+    String(number),
+    '--repo',
+    `${owner}/${repo}`,
+    '--json',
+    'body',
+  ])
+
+  const data = JSON.parse(result) as { body: string }
+  return data.body || ''
+}
+
+/**
  * Check if gh CLI is authenticated
  */
 export async function checkAuth(): Promise<boolean> {
@@ -295,6 +315,7 @@ export async function checkAuth(): Promise<boolean> {
 interface GhSearchResult {
   number: number
   title: string
+  body: string
   author: { login: string }
   repository: { nameWithOwner: string }
   url: string
@@ -312,7 +333,7 @@ export async function searchPRs(query: string): Promise<GitHubSearchPR[]> {
     'prs',
     query,
     '--json',
-    'number,title,author,repository,url,headRefOid,state,isDraft',
+    'number,title,body,author,repository,url,headRefOid,state,isDraft',
     '--limit',
     '50',
   ])
@@ -329,6 +350,7 @@ export async function searchPRs(query: string): Promise<GitHubSearchPR[]> {
       author: pr.author.login,
       url: pr.url,
       headSha: pr.headRefOid,
+      body: pr.body || undefined,
       state: mapPRState(pr.state),
     }
   })

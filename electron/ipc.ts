@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { fetchPR, postComments, checkAuth, getPRHeadSha, searchPRs, getPRStatus } from './github'
+import { fetchPR, fetchPRBody, postComments, checkAuth, getPRHeadSha, searchPRs, getPRStatus } from './github'
 import { analyzePR, refinementChat, checkClaudeAuth } from './claude'
 import { loadPersonas } from './personas'
 import { saveState, loadState, clearState } from './persistence'
@@ -23,6 +23,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('github:fetchPR', async (_event, prRef: string) => {
     return fetchPR(prRef)
+  })
+
+  ipcMain.handle('github:fetchPRBody', async (_event, prRef: string) => {
+    return fetchPRBody(prRef)
   })
 
   ipcMain.handle('github:postComments', async (_event, prRef: string, comments: ReviewComment[]) => {

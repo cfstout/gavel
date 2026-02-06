@@ -15,6 +15,7 @@
     "react": "^18.3.1",
     "react-diff-view": "^3.3.2",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "refractor": "^5.0.0",
     "unidiff": "^1.0.4",
     "zustand": "^5.0.2"
@@ -53,7 +54,10 @@
       "category": "public.app-category.developer-tools"
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
     "win": {
       "target": "nsis"

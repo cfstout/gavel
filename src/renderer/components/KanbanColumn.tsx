@@ -8,6 +8,7 @@ interface KanbanColumnProps {
   emptyMessage: string
   onReview: (pr: InboxPR) => void
   onIgnore?: (pr: InboxPR) => void
+  onCardClick?: (pr: InboxPR) => void
   showActions?: boolean
 }
 
@@ -18,6 +19,7 @@ export function KanbanColumn({
   emptyMessage,
   onReview,
   onIgnore,
+  onCardClick,
   showActions = true,
 }: KanbanColumnProps) {
   return (
@@ -37,6 +39,7 @@ export function KanbanColumn({
               pr={pr}
               onReview={onReview}
               onIgnore={onIgnore}
+              onCardClick={onCardClick}
               showActions={showActions}
             />
           ))

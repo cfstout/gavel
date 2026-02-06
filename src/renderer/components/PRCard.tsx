@@ -4,15 +4,16 @@ interface PRCardProps {
   pr: InboxPR
   onReview: (pr: InboxPR) => void
   onIgnore?: (pr: InboxPR) => void
+  onCardClick?: (pr: InboxPR) => void
   showActions?: boolean
 }
 
-export function PRCard({ pr, onReview, onIgnore, showActions = true }: PRCardProps) {
+export function PRCard({ pr, onReview, onIgnore, onCardClick, showActions = true }: PRCardProps) {
   const sourceIcon = pr.source === 'github-search' ? '🔍' : '💬'
   const sourceLabel = pr.source === 'github-search' ? 'GitHub' : 'Slack'
 
   return (
-    <div className="pr-card">
+    <div className="pr-card" onClick={() => onCardClick?.(pr)}>
       <div className="pr-card-header">
         <span className="pr-card-title">{pr.title}</span>
         <span className="pr-card-number">#{pr.number}</span>
@@ -29,7 +30,7 @@ export function PRCard({ pr, onReview, onIgnore, showActions = true }: PRCardPro
       </div>
 
       {showActions && (
-        <div className="pr-card-actions">
+        <div className="pr-card-actions" onClick={(e) => e.stopPropagation()}>
           <button className="review-btn" onClick={() => onReview(pr)}>
             Review
           </button>

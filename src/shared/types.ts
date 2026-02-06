@@ -10,6 +10,7 @@ export interface InboxPR {
   author: string
   url: string
   headSha: string // Track for change detection
+  body?: string // PR description
   column: KanbanColumn
   source: 'github-search' | 'slack'
   sourceId: string // Which source found this PR
@@ -128,6 +129,7 @@ export interface GitHubSearchPR {
   author: string
   url: string
   headSha: string
+  body?: string
   state: 'open' | 'closed' | 'merged'
 }
 
@@ -142,6 +144,7 @@ export interface ElectronAPI {
   // GitHub
   checkGitHubAuth: () => Promise<boolean>
   fetchPR: (prUrl: string) => Promise<PRData>
+  fetchPRBody: (prRef: string) => Promise<string>
   postComments: (prUrl: string, comments: ReviewComment[]) => Promise<PostCommentsResult>
   searchPRs: (query: string) => Promise<GitHubSearchPR[]>
   getPRStatus: (prRef: string) => Promise<PRStatusResult>

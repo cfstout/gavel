@@ -238,7 +238,7 @@ async function fetchPRDetails(
     const proc = spawn('gh', [
       'pr', 'view', String(number),
       '--repo', `${owner}/${repo}`,
-      '--json', 'title,author,url,headRefOid,state,mergedAt',
+      '--json', 'title,body,author,url,headRefOid,state,mergedAt',
     ])
 
     let stdout = ''
@@ -257,6 +257,7 @@ async function fetchPRDetails(
       try {
         const data = JSON.parse(stdout) as {
           title: string
+          body: string
           author: { login: string }
           url: string
           headRefOid: string
@@ -272,6 +273,7 @@ async function fetchPRDetails(
           author: data.author.login,
           url: data.url,
           headSha: data.headRefOid,
+          body: data.body || undefined,
           state: data.mergedAt ? 'merged' : mapState(data.state),
         })
       } catch {

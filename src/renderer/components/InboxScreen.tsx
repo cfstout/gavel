@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { InboxPR } from '@shared/types'
 import { useInboxStore } from '../store/inboxStore'
 import { KanbanColumn } from './KanbanColumn'
+import { PRDetailModal } from './PRDetailModal'
 import { SourceConfigModal } from './SourceConfigModal'
 import '../styles/Inbox.css'
 
@@ -25,6 +26,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
   } = useInboxStore()
 
   const [showSourceModal, setShowSourceModal] = useState(false)
+  const [selectedPR, setSelectedPR] = useState<InboxPR | null>(null)
 
   useEffect(() => {
     if (!isInitialized) {
@@ -45,6 +47,10 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
     },
     [ignorePR]
   )
+
+  const handleCardClick = useCallback((pr: InboxPR) => {
+    setSelectedPR(pr)
+  }, [])
 
   const formatLastPoll = (timestamp: string | null) => {
     if (!timestamp) return 'Never'
@@ -135,6 +141,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
           emptyMessage="No new PRs"
           onReview={handleReview}
           onIgnore={handleIgnore}
+          onCardClick={handleCardClick}
         />
 
         <KanbanColumn
@@ -143,6 +150,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
           prs={reviewedPRs}
           emptyMessage="No reviewed PRs"
           onReview={handleReview}
+          onCardClick={handleCardClick}
           showActions={false}
         />
 
@@ -153,6 +161,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
           emptyMessage="All caught up!"
           onReview={handleReview}
           onIgnore={handleIgnore}
+          onCardClick={handleCardClick}
         />
 
         <KanbanColumn
@@ -161,6 +170,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
           prs={donePRs}
           emptyMessage="No completed PRs"
           onReview={handleReview}
+          onCardClick={handleCardClick}
           showActions={false}
         />
       </div>
@@ -170,6 +180,7 @@ export function InboxScreen({ onReviewPR, onManualEntry }: InboxScreenProps) {
       </div>
 
       {showSourceModal && <SourceConfigModal onClose={() => setShowSourceModal(false)} />}
+      {selectedPR && <PRDetailModal pr={selectedPR} onClose={() => setSelectedPR(null)} />}
     </div>
   )
 }
