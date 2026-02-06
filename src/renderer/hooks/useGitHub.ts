@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { PRData, ReviewComment } from '@shared/types'
+import type { PRData, ReviewComment, ReviewEventType } from '@shared/types'
 
 interface UseGitHubResult {
   isAuthenticated: boolean | null
@@ -8,7 +8,7 @@ interface UseGitHubResult {
   error: string | null
   checkAuth: () => Promise<boolean>
   fetchPR: (prRef: string) => Promise<PRData | null>
-  postComments: (comments: ReviewComment[]) => Promise<void>
+  postComments: (comments: ReviewComment[], reviewType: ReviewEventType) => Promise<void>
 }
 
 export function useGitHub(): UseGitHubResult {
@@ -46,7 +46,7 @@ export function useGitHub(): UseGitHubResult {
   }, [])
 
   const postComments = useCallback(
-    async (comments: ReviewComment[]) => {
+    async (comments: ReviewComment[], reviewType: ReviewEventType) => {
       if (!prData) {
         throw new Error('No PR loaded')
       }
@@ -56,7 +56,7 @@ export function useGitHub(): UseGitHubResult {
 
       try {
         const prRef = `${prData.metadata.owner}/${prData.metadata.repo}#${prData.metadata.number}`
-        await window.electronAPI.postComments(prRef, comments)
+        await window.electronAPI.postComments(prRef, comments, reviewType)
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to post comments'
         setError(message)
