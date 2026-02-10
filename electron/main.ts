@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { registerIpcHandlers } from './ipc'
@@ -30,6 +30,14 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
+  })
+
+  // Open external links in the system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
   })
 
   if (VITE_DEV_SERVER_URL) {
