@@ -188,35 +188,74 @@ export async function refinementChat(
 }
 
 /**
+ * Annotate a unified diff with new-file line numbers on context and added lines.
+ *
+ * Produces output like:
+ *   @@ -10,6 +10,8 @@ function example()
+ *   [L10]  existing line
+ *   [L11]  another line
+ *   [L12] +new line
+ *         -removed line
+ *   [L13]  more context
+ */
+export function annotateDiffWithLineNumbers(diff: string): string {
+  const lines = diff.split('\n')
+  const output: string[] = []
+  let newLineNum = 0
+
+  for (const line of lines) {
+    // Hunk header — reset line counter
+    const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunkMatch) {
+      newLineNum = parseInt(hunkMatch[1], 10)
+      output.push(line)
+      continue
+    }
+
+    // Inside a hunk
+    if (newLineNum > 0) {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        output.push(`[L${newLineNum}] ${line}`)
+        newLineNum++
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        // Removed lines don't have a new-file line number
+        output.push(`      ${line}`)
+      } else if (line.startsWith('\\')) {
+        output.push(line)
+      } else {
+        // Context line
+        output.push(`[L${newLineNum}] ${line}`)
+        newLineNum++
+      }
+    } else {
+      // File headers, etc.
+      output.push(line)
+    }
+  }
+
+  return output.join('\n')
+}
+
+/**
  * Build the analysis prompt for Claude
  */
 function buildAnalysisPrompt(diff: string, personaContent: string): string {
+  const annotatedDiff = annotateDiffWithLineNumbers(diff)
+
   return `You are a code reviewer. Your task is to analyze the following pull request diff and provide review comments.
 
 ## Review Instructions
 ${personaContent}
 
-## CRITICAL: Line Number Rules
-You can ONLY comment on lines that appear in the diff hunks. Each hunk starts with @@ and shows line ranges.
-
-For example, if you see:
-\`\`\`
-@@ -10,6 +10,8 @@ function example() {
-   existing line      <- This is line 10 (context)
-   another line       <- This is line 11 (context)
-+  new line           <- This is line 12 (added - you CAN comment here)
-+  another new        <- This is line 13 (added - you CAN comment here)
-   more context       <- This is line 14 (context)
-\`\`\`
-
-The "+10,8" means the new file starts at line 10 and shows 8 lines. You can ONLY use line numbers that appear in the hunk (10-17 in this example).
-
-DO NOT guess line numbers outside the diff. If you want to comment on code not shown in the diff, you cannot - skip it.
+## Line Numbers
+Each context and added line in the diff is prefixed with \`[L##]\` showing its line number in the new file.
+Use these line numbers directly when creating comments. Removed lines have no prefix — you cannot comment on them.
+You can ONLY comment on lines that have a \`[L##]\` prefix.
 
 ## Output Format
 Respond with a JSON array. Each comment needs:
 - file: exact file path from the diff (e.g., "src/utils.ts")
-- line: line number from the NEW version (right side of diff) - MUST be within a hunk
+- line: the number from the \`[L##]\` prefix on the line you're commenting on
 - message: specific, actionable feedback
 - severity: "suggestion" | "warning" | "critical"
 
@@ -236,10 +275,10 @@ Return an empty array [] if no issues found.
 
 ## Pull Request Diff
 \`\`\`diff
-${diff}
+${annotatedDiff}
 \`\`\`
 
-Analyze this diff and return ONLY the JSON array. Remember: only use line numbers actually shown in the hunks above.`
+Analyze this diff and return ONLY the JSON array.`
 }
 
 /**

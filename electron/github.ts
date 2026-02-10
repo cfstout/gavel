@@ -290,13 +290,7 @@ export async function getPRHeadSha(prRef: string): Promise<string> {
  * Format a comment body with severity indicator
  */
 function formatCommentBody(comment: ReviewComment): string {
-  const severityEmoji = {
-    suggestion: '💡',
-    warning: '⚠️',
-    critical: '🚨',
-  }
-
-  return `${severityEmoji[comment.severity]} **${comment.severity.toUpperCase()}**\n\n${comment.message}`
+  return `**${comment.severity}:** ${comment.message}`
 }
 
 /**
