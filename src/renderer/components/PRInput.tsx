@@ -4,9 +4,10 @@ import './PRInput.css'
 
 interface PRInputProps {
   onNext: () => void
+  onBack: () => void
 }
 
-export function PRInput({ onNext }: PRInputProps) {
+export function PRInput({ onNext, onBack }: PRInputProps) {
   const { prRef, setPRRef, setPRData, setError, error } = useReviewStore()
   const [isLoading, setIsLoading] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
@@ -83,6 +84,9 @@ export function PRInput({ onNext }: PRInputProps) {
         )}
 
         <div className="pr-input-actions">
+          <button type="button" onClick={onBack} disabled={isLoading}>
+            Back
+          </button>
           <button
             type="submit"
             className="primary"

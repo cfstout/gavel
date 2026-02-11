@@ -99,6 +99,10 @@ export default function App() {
     setScreen('persona-select')
   }, [setScreen])
 
+  const handlePRInputBack = useCallback(() => {
+    setScreen('inbox')
+  }, [setScreen])
+
   const handlePersonaBack = useCallback(() => {
     setScreen(enteredFromRef.current)
   }, [setScreen])
@@ -167,7 +171,7 @@ export default function App() {
         )
 
       case 'pr-input':
-        return <PRInput onNext={handlePRInputNext} />
+        return <PRInput onNext={handlePRInputNext} onBack={handlePRInputBack} />
 
       case 'persona-select':
         return (
