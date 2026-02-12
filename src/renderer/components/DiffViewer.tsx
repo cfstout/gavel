@@ -1,20 +1,10 @@
 import { useMemo, useState, useCallback, Component, ReactNode } from 'react'
-import { Diff, Hunk, parseDiff } from 'react-diff-view'
-import type { ReviewComment } from '@shared/types'
+import { Diff, Hunk, parseDiff, getChangeKey } from 'react-diff-view'
+import type { ChangeData } from 'react-diff-view'
+import type { ReviewComment, CommentStatus } from '@shared/types'
+import { InlineCommentCard } from './InlineCommentCard'
 import 'react-diff-view/style/index.css'
 import './DiffViewer.css'
-
-// Generate change key matching react-diff-view's internal format
-function getChangeKey(change: DiffChange): string {
-  if (change.type === 'insert') {
-    return `I${change.lineNumber ?? change.newLineNumber}`
-  }
-  if (change.type === 'delete') {
-    return `D${change.lineNumber ?? change.oldLineNumber}`
-  }
-  // Normal line
-  return `N${change.oldLineNumber},${change.newLineNumber}`
-}
 
 // Error boundary to catch rendering errors in diff view
 class DiffErrorBoundary extends Component<
@@ -51,6 +41,8 @@ interface DiffViewerProps {
   commentingOnLine?: number | null
   onCommentSubmit?: (message: string, severity: ReviewComment['severity']) => void
   onCommentCancel?: () => void
+  onUpdateMessage: (commentId: string, message: string) => void
+  onUpdateStatus: (commentId: string, status: CommentStatus) => void
 }
 
 // Type for react-diff-view change objects
@@ -75,11 +67,21 @@ interface DiffHunk {
   changes: DiffChange[]
 }
 
-export function DiffViewer({ diff, filename, comments, onLineClick, commentingOnLine, onCommentSubmit, onCommentCancel }: DiffViewerProps) {
+export function DiffViewer({
+  diff,
+  filename,
+  comments,
+  onLineClick,
+  commentingOnLine,
+  onCommentSubmit,
+  onCommentCancel,
+  onUpdateMessage,
+  onUpdateStatus,
+}: DiffViewerProps) {
   const { files, parseError } = useMemo(() => {
     if (!diff) return { files: [], parseError: null }
     try {
-      const parsed = parseDiff(diff)
+      const parsed = parseDiff(diff, { nearbySequences: 'zip' })
       return { files: parsed, parseError: null }
     } catch (err) {
       console.error('Failed to parse diff:', err)
@@ -99,7 +101,7 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
         // For inserts and normal lines, map the new line number to the change key
         const newLine = change.newLineNumber ?? change.lineNumber
         if (newLine !== undefined && (change.type === 'insert' || change.type === 'normal')) {
-          const key = getChangeKey(change)
+          const key = getChangeKey(change as ChangeData)
           map.set(newLine, key)
         }
       }
@@ -128,15 +130,11 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
         result[changeKey] = (
           <div key={`widgets-${comment.id}`}>
             {existing}
-            <div
-              className={`diff-inline-comment severity-${comment.severity}${comment.source === 'manual' ? ' source-manual' : ''}`}
-            >
-              <div className="inline-comment-marker">
-                <span className="comment-label">{comment.severity}:</span>
-                <span className="inline-comment-message">{comment.message}</span>
-                {comment.source === 'manual' && <span className="comment-source-badge">manual</span>}
-              </div>
-            </div>
+            <InlineCommentCard
+              comment={comment}
+              onUpdateMessage={onUpdateMessage}
+              onUpdateStatus={onUpdateStatus}
+            />
           </div>
         )
       }
@@ -157,7 +155,7 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
     }
 
     return result
-  }, [comments, lineToChangeKey, commentingOnLine, onCommentSubmit, onCommentCancel])
+  }, [comments, lineToChangeKey, commentingOnLine, onCommentSubmit, onCommentCancel, onUpdateMessage, onUpdateStatus])
 
   if (parseError) {
     return (
@@ -196,7 +194,7 @@ export function DiffViewer({ diff, filename, comments, onLineClick, commentingOn
         </div>
         <div className={`diff-content${onLineClick ? ' gutter-clickable' : ''}`}>
           <Diff
-            viewType="unified"
+            viewType="split"
             diffType={file.type}
             hunks={file.hunks}
             widgets={widgets}
@@ -267,4 +265,3 @@ function CommentForm({ onSubmit, onCancel }: {
     </div>
   )
 }
-

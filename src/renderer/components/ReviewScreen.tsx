@@ -2,8 +2,6 @@ import { useState, useMemo, useCallback } from 'react'
 import { useReviewStore } from '../store/reviewStore'
 import { DiffViewer } from './DiffViewer'
 import { FileTree } from './FileTree'
-import { CommentList } from './CommentList'
-import { ChatPanel } from './ChatPanel'
 import { SubmitModal } from './SubmitModal'
 import type { ReviewComment } from '@shared/types'
 import './ReviewScreen.css'
@@ -14,7 +12,16 @@ interface ReviewScreenProps {
 }
 
 export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
-  const { prData, comments, selectedPersona, reset, isAnalyzing, addComment } = useReviewStore()
+  const {
+    prData,
+    comments,
+    selectedPersona,
+    reset,
+    isAnalyzing,
+    addComment,
+    updateCommentStatus,
+    updateCommentMessage,
+  } = useReviewStore()
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const [commentingOnLine, setCommentingOnLine] = useState<{ file: string; line: number } | null>(null)
 
@@ -32,8 +39,6 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(
     prData?.files[0]?.filename ?? null
   )
-  const [showCommentPanel, setShowCommentPanel] = useState(true)
-  const [refiningComment, setRefiningComment] = useState<ReviewComment | null>(null)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
   // Get comments for the selected file
@@ -47,10 +52,6 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
     if (!selectedFile || !prData?.diff) return ''
     return extractFileDiff(prData.diff, selectedFile)
   }, [prData?.diff, selectedFile])
-
-  const handleRefine = (comment: ReviewComment) => {
-    setRefiningComment(comment)
-  }
 
   const handleLineClick = useCallback((file: string, line: number) => {
     setCommentingOnLine({ file, line })
@@ -108,12 +109,6 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
             Exit Review
           </button>
           <button
-            className="toggle-comments"
-            onClick={() => setShowCommentPanel(!showCommentPanel)}
-          >
-            {showCommentPanel ? 'Hide Comments' : 'Show Comments'}
-          </button>
-          <button
             className="primary"
             onClick={() => setShowSubmitModal(true)}
           >
@@ -153,6 +148,8 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
               commentingOnLine={commentingOnLine?.file === selectedFile ? commentingOnLine.line : null}
               onCommentSubmit={handleCommentSubmit}
               onCommentCancel={handleCommentCancel}
+              onUpdateMessage={updateCommentMessage}
+              onUpdateStatus={updateCommentStatus}
             />
           ) : (
             <div className="no-file-selected">
@@ -160,22 +157,7 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
             </div>
           )}
         </div>
-
-        {showCommentPanel && (
-          <CommentList
-            comments={comments}
-            onFileClick={(file) => setSelectedFile(file)}
-            onRefine={handleRefine}
-          />
-        )}
       </div>
-
-      {refiningComment && (
-        <ChatPanel
-          comment={refiningComment}
-          onClose={() => setRefiningComment(null)}
-        />
-      )}
 
       {showSubmitModal && (
         <SubmitModal
