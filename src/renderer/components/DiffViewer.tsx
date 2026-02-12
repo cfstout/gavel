@@ -113,7 +113,7 @@ export function DiffViewer({
   const handleGutterClick = useCallback((change: DiffChange) => {
     if (!onLineClick) return
     if (change.type === 'delete') return
-    const line = change.newLineNumber
+    const line = change.newLineNumber ?? change.lineNumber
     if (line !== undefined) {
       onLineClick(line)
     }
