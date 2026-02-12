@@ -71,17 +71,7 @@
 
 .review-main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.no-file-selected {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--color-text-muted);
+  overflow-y: auto;
 }
 
 /* Exit button */

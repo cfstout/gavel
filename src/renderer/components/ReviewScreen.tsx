@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useReviewStore } from '../store/reviewStore'
 import { DiffViewer } from './DiffViewer'
 import { FileTree } from './FileTree'
 import { SubmitModal } from './SubmitModal'
-import type { ReviewComment } from '@shared/types'
+import type { ReviewComment, CommentStatus } from '@shared/types'
 import './ReviewScreen.css'
 
 interface ReviewScreenProps {
@@ -36,22 +36,14 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
     [comments]
   )
 
-  const [selectedFile, setSelectedFile] = useState<string | null>(
-    prData?.files[0]?.filename ?? null
-  )
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
-  // Get comments for the selected file
-  const fileComments = useMemo(() => {
-    if (!selectedFile) return []
-    return comments.filter((c) => c.file === selectedFile)
-  }, [comments, selectedFile])
+  const commentsByFile = useMemo(() => getCommentsByFile(comments), [comments])
 
-  // Get diff for selected file from the full diff
-  const fileDiff = useMemo(() => {
-    if (!selectedFile || !prData?.diff) return ''
-    return extractFileDiff(prData.diff, selectedFile)
-  }, [prData?.diff, selectedFile])
+  const handleScrollToFile = useCallback((filename: string) => {
+    document.getElementById(`file-diff-${encodeURIComponent(filename)}`)
+      ?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   const handleLineClick = useCallback((file: string, line: number) => {
     setCommentingOnLine({ file, line })
@@ -133,29 +125,25 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
       <div className="review-content">
         <FileTree
           files={prData.files}
-          selectedFile={selectedFile}
-          onSelectFile={setSelectedFile}
-          commentsByFile={getCommentsByFile(comments)}
+          onScrollToFile={handleScrollToFile}
+          commentsByFile={commentsByFile}
         />
 
         <div className="review-main">
-          {selectedFile ? (
-            <DiffViewer
-              diff={fileDiff}
-              filename={selectedFile}
-              comments={fileComments}
-              onLineClick={(line) => handleLineClick(selectedFile, line)}
-              commentingOnLine={commentingOnLine?.file === selectedFile ? commentingOnLine.line : null}
+          {prData.files.map((file) => (
+            <FileDiffSection
+              key={file.filename}
+              filename={file.filename}
+              fullDiff={prData.diff}
+              comments={comments}
+              commentingOnLine={commentingOnLine}
+              onLineClick={handleLineClick}
               onCommentSubmit={handleCommentSubmit}
               onCommentCancel={handleCommentCancel}
               onUpdateMessage={updateCommentMessage}
               onUpdateStatus={updateCommentStatus}
             />
-          ) : (
-            <div className="no-file-selected">
-              Select a file from the sidebar to view changes
-            </div>
-          )}
+          ))}
         </div>
       </div>
 
@@ -168,6 +156,52 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
     </div>
   )
 }
+
+/**
+ * Wrapper component to memoize per-file diff extraction and comment filtering.
+ */
+interface FileDiffSectionProps {
+  filename: string
+  fullDiff: string
+  comments: ReviewComment[]
+  commentingOnLine: { file: string; line: number } | null
+  onLineClick: (file: string, line: number) => void
+  onCommentSubmit: (message: string, severity: ReviewComment['severity']) => void
+  onCommentCancel: () => void
+  onUpdateMessage: (commentId: string, message: string) => void
+  onUpdateStatus: (commentId: string, status: CommentStatus) => void
+}
+
+const FileDiffSection = memo(function FileDiffSection({
+  filename,
+  fullDiff,
+  comments,
+  commentingOnLine,
+  onLineClick,
+  onCommentSubmit,
+  onCommentCancel,
+  onUpdateMessage,
+  onUpdateStatus,
+}: FileDiffSectionProps) {
+  const fileDiff = useMemo(() => extractFileDiff(fullDiff, filename), [fullDiff, filename])
+  const fileComments = useMemo(() => comments.filter((c) => c.file === filename), [comments, filename])
+
+  return (
+    <div id={`file-diff-${encodeURIComponent(filename)}`}>
+      <DiffViewer
+        diff={fileDiff}
+        filename={filename}
+        comments={fileComments}
+        onLineClick={(line) => onLineClick(filename, line)}
+        commentingOnLine={commentingOnLine?.file === filename ? commentingOnLine.line : null}
+        onCommentSubmit={onCommentSubmit}
+        onCommentCancel={onCommentCancel}
+        onUpdateMessage={onUpdateMessage}
+        onUpdateStatus={onUpdateStatus}
+      />
+    </div>
+  )
+})
 
 /**
  * Extract the diff for a specific file from the full diff

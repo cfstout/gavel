@@ -55,11 +55,6 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.file-tree-item.selected {
-  background-color: rgba(88, 166, 255, 0.15);
-  color: var(--color-text-primary);
-}
-
 .file-status {
   flex-shrink: 0;
   width: 16px;

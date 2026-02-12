@@ -3,15 +3,13 @@ import './FileTree.css'
 
 interface FileTreeProps {
   files: PRFile[]
-  selectedFile: string | null
-  onSelectFile: (filename: string) => void
+  onScrollToFile: (filename: string) => void
   commentsByFile: Record<string, number>
 }
 
 export function FileTree({
   files,
-  selectedFile,
-  onSelectFile,
+  onScrollToFile,
   commentsByFile,
 }: FileTreeProps) {
   return (
@@ -24,10 +22,8 @@ export function FileTree({
         {files.map((file) => (
           <button
             key={file.filename}
-            className={`file-tree-item ${
-              selectedFile === file.filename ? 'selected' : ''
-            }`}
-            onClick={() => onSelectFile(file.filename)}
+            className="file-tree-item"
+            onClick={() => onScrollToFile(file.filename)}
           >
             <span className={`file-status status-${file.status}`}>
               {getStatusIcon(file.status)}
