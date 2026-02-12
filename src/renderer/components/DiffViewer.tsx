@@ -41,8 +41,6 @@ interface DiffViewerProps {
   commentingOnLine?: number | null
   onCommentSubmit?: (message: string, severity: ReviewComment['severity']) => void
   onCommentCancel?: () => void
-  onApprove: (commentId: string) => void
-  onReject: (commentId: string) => void
   onUpdateMessage: (commentId: string, message: string) => void
   onUpdateStatus: (commentId: string, status: CommentStatus) => void
 }
@@ -77,8 +75,6 @@ export function DiffViewer({
   commentingOnLine,
   onCommentSubmit,
   onCommentCancel,
-  onApprove,
-  onReject,
   onUpdateMessage,
   onUpdateStatus,
 }: DiffViewerProps) {
@@ -136,8 +132,6 @@ export function DiffViewer({
             {existing}
             <InlineCommentCard
               comment={comment}
-              onApprove={() => onApprove(comment.id)}
-              onReject={() => onReject(comment.id)}
               onUpdateMessage={onUpdateMessage}
               onUpdateStatus={onUpdateStatus}
             />
@@ -161,7 +155,7 @@ export function DiffViewer({
     }
 
     return result
-  }, [comments, lineToChangeKey, commentingOnLine, onCommentSubmit, onCommentCancel, onApprove, onReject, onUpdateMessage, onUpdateStatus])
+  }, [comments, lineToChangeKey, commentingOnLine, onCommentSubmit, onCommentCancel, onUpdateMessage, onUpdateStatus])
 
   if (parseError) {
     return (

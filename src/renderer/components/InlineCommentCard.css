@@ -31,8 +31,8 @@
   border-left: 3px solid var(--color-accent-blue);
 }
 
-/* Status border overrides */
-.inline-comment-card.status-approved {
+/* Status border overrides — targets .inline-card-body where border-left is set */
+.inline-comment-card.status-approved .inline-card-body {
   border-left-color: var(--color-accent-green);
 }
 

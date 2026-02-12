@@ -77,14 +77,6 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
     setCommentingOnLine(null)
   }, [])
 
-  const handleApprove = useCallback((commentId: string) => {
-    updateCommentStatus(commentId, 'approved')
-  }, [updateCommentStatus])
-
-  const handleReject = useCallback((commentId: string) => {
-    updateCommentStatus(commentId, 'rejected')
-  }, [updateCommentStatus])
-
   if (!prData) {
     return <div className="review-screen">No PR data loaded</div>
   }
@@ -156,8 +148,6 @@ export function ReviewScreen({ onSubmitSuccess, onBack }: ReviewScreenProps) {
               commentingOnLine={commentingOnLine?.file === selectedFile ? commentingOnLine.line : null}
               onCommentSubmit={handleCommentSubmit}
               onCommentCancel={handleCommentCancel}
-              onApprove={handleApprove}
-              onReject={handleReject}
               onUpdateMessage={updateCommentMessage}
               onUpdateStatus={updateCommentStatus}
             />

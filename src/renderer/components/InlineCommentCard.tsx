@@ -4,8 +4,6 @@ import './InlineCommentCard.css'
 
 interface InlineCommentCardProps {
   comment: ReviewComment
-  onApprove: () => void
-  onReject: () => void
   onUpdateMessage: (commentId: string, message: string) => void
   onUpdateStatus: (commentId: string, status: CommentStatus) => void
 }
@@ -17,8 +15,6 @@ interface ChatMessage {
 
 export function InlineCommentCard({
   comment,
-  onApprove,
-  onReject,
   onUpdateMessage,
   onUpdateStatus,
 }: InlineCommentCardProps) {
@@ -93,14 +89,14 @@ export function InlineCommentCard({
           </span>
           <button
             className={`inline-action approve${comment.status === 'approved' ? ' active' : ''}`}
-            onClick={onApprove}
+            onClick={() => onUpdateStatus(comment.id, 'approved')}
             title="Approve"
           >
             ✓
           </button>
           <button
             className={`inline-action reject${comment.status === 'rejected' ? ' active' : ''}`}
-            onClick={onReject}
+            onClick={() => onUpdateStatus(comment.id, 'rejected')}
             title="Reject"
           >
             ✗
