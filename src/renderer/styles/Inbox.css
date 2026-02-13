@@ -246,6 +246,13 @@
   color: #ffc300;
 }
 
+.pr-card-age {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 /* Empty State */
 .inbox-empty-state {
   display: flex;
