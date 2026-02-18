@@ -1,10 +1,76 @@
 import { useMemo, useState, useCallback, Component, ReactNode } from 'react'
-import { Diff, Hunk, parseDiff, getChangeKey } from 'react-diff-view'
+import { Diff, Hunk, parseDiff, getChangeKey, tokenize, markEdits } from 'react-diff-view'
 import type { ChangeData } from 'react-diff-view'
+import { refractor } from 'refractor'
+import scala from 'refractor/scala'
 import type { ReviewComment, CommentStatus } from '@shared/types'
 import { InlineCommentCard } from './InlineCommentCard'
 import 'react-diff-view/style/index.css'
 import './DiffViewer.css'
+
+refractor.register(scala)
+
+const EXT_TO_LANGUAGE: Record<string, string> = {
+  '.scala': 'scala',
+  '.sc': 'scala',
+  '.java': 'java',
+  '.kt': 'kotlin',
+  '.kts': 'kotlin',
+  '.js': 'javascript',
+  '.jsx': 'javascript',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  '.py': 'python',
+  '.pyi': 'python',
+  '.bzl': 'python',
+  '.bazel': 'python',
+  '.go': 'go',
+  '.rs': 'rust',
+  '.rb': 'ruby',
+  '.swift': 'swift',
+  '.c': 'c',
+  '.h': 'c',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.hpp': 'cpp',
+  '.cs': 'csharp',
+  '.css': 'css',
+  '.scss': 'scss',
+  '.less': 'less',
+  '.html': 'html',
+  '.xml': 'xml',
+  '.json': 'json',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
+  '.md': 'markdown',
+  '.sql': 'sql',
+  '.sh': 'bash',
+  '.bash': 'bash',
+  '.zsh': 'bash',
+  '.lua': 'lua',
+  '.r': 'r',
+  '.php': 'php',
+  '.pl': 'perl',
+  '.mk': 'makefile',
+  '.ini': 'ini',
+  '.toml': 'ini',
+}
+
+const FILENAME_TO_LANGUAGE: Record<string, string> = {
+  'BUILD': 'python',
+  'BUILD.bazel': 'python',
+  'WORKSPACE': 'python',
+  'WORKSPACE.bazel': 'python',
+  'Makefile': 'makefile',
+  'Dockerfile': 'bash',
+}
+
+function detectLanguage(filename: string): string | null {
+  const basename = filename.split('/').pop() ?? ''
+  if (FILENAME_TO_LANGUAGE[basename]) return FILENAME_TO_LANGUAGE[basename]
+  const ext = basename.includes('.') ? '.' + basename.split('.').pop() : ''
+  return EXT_TO_LANGUAGE[ext] ?? null
+}
 
 // Error boundary to catch rendering errors in diff view
 class DiffErrorBoundary extends Component<
@@ -90,6 +156,24 @@ export function DiffViewer({
   }, [diff])
 
   const file = files[0]
+
+  // Tokenize hunks for syntax highlighting
+  const tokens = useMemo(() => {
+    if (!file?.hunks?.length) return undefined
+    const language = detectLanguage(filename)
+    if (!language) return undefined
+    try {
+      return tokenize(file.hunks, {
+        highlight: true,
+        refractor,
+        language,
+        enhancers: [markEdits(file.hunks)],
+      })
+    } catch (err) {
+      console.warn(`Syntax highlighting failed for ${filename}:`, err)
+      return undefined
+    }
+  }, [file?.hunks, filename])
 
   // Build a map of new line numbers to change keys for widget placement
   const lineToChangeKey = useMemo(() => {
@@ -197,6 +281,7 @@ export function DiffViewer({
             viewType="split"
             diffType={file.type}
             hunks={file.hunks}
+            tokens={tokens}
             widgets={widgets}
             gutterEvents={{ onClick: ({ change }: { change: DiffChange | null }) => { if (change) handleGutterClick(change) } }}
           >
