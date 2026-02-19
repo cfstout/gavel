@@ -332,7 +332,6 @@ interface GhSearchResult {
   author: { login: string }
   repository: { nameWithOwner: string }
   url: string
-  headRefOid: string
   state: string
   isDraft: boolean
 }
@@ -346,7 +345,7 @@ export async function searchPRs(query: string): Promise<GitHubSearchPR[]> {
     'prs',
     query,
     '--json',
-    'number,title,body,author,repository,url,headRefOid,state,isDraft',
+    'number,title,body,author,repository,url,state,isDraft',
     '--limit',
     '50',
   ])
@@ -362,7 +361,7 @@ export async function searchPRs(query: string): Promise<GitHubSearchPR[]> {
       title: pr.title,
       author: pr.author.login,
       url: pr.url,
-      headSha: pr.headRefOid,
+      headSha: '', // gh search prs doesn't support headRefOid; backfilled by status polling
       body: pr.body || undefined,
       state: mapPRState(pr.state),
     }
