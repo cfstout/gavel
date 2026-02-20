@@ -22,7 +22,7 @@ export function useGitHub(): UseGitHubResult {
       const authed = await window.electronAPI.checkGitHubAuth()
       setIsAuthenticated(authed)
       return authed
-    } catch (err) {
+    } catch {
       setIsAuthenticated(false)
       return false
     }
