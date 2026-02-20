@@ -184,7 +184,7 @@ async function pollSource(state: InboxState, source: PRSource): Promise<InboxSta
             ? {
                 ...p,
                 title: pr.title,
-                headSha: pr.headSha,
+                headSha: pr.headSha || p.headSha,
                 body: pr.body ?? p.body,
                 lastCheckedAt: new Date().toISOString(),
               }
