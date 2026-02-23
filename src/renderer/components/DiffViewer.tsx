@@ -10,6 +10,13 @@ import './DiffViewer.css'
 
 refractor.register(scala)
 
+// refractor v5 returns a Root node from highlight(), but react-diff-view
+// expects an array of nodes. Wrap refractor to unwrap the root.
+const refractorAdapter = {
+  highlight: (code: string, language: string) =>
+    refractor.highlight(code, language).children,
+}
+
 const EXT_TO_LANGUAGE: Record<string, string> = {
   '.scala': 'scala',
   '.sc': 'scala',
@@ -165,7 +172,7 @@ export function DiffViewer({
     try {
       return tokenize(file.hunks, {
         highlight: true,
-        refractor,
+        refractor: refractorAdapter,
         language,
         enhancers: [markEdits(file.hunks)],
       })
